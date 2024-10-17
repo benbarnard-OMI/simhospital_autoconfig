@@ -19,19 +19,19 @@ allergy:
   # Reference:
   # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/Default.aspx?version=HL7%20v2.3.1&table=0127
   types:
-    - "DA"
-    - "FA"
-    - "MA"
-    - "MC"
+    - "${ALLERGY_TYPE_1}"
+    - "${ALLERGY_TYPE_2}"
+    - "${ALLERGY_TYPE_3}"
+    - "${ALLERGY_TYPE_4}"
   # Reference:
   # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/Default.aspx?version=HL7%20v2.3.1&table=0128
   severities:
-    - "SV"
-    - "MO"
-    - "MI"
+    - "${ALLERGY_SEVERITY_1}"
+    - "${ALLERGY_SEVERITY_2}"
+    - "${ALLERGY_SEVERITY_3}"
   # SNOMED International coding system. Reference:
   # http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0396
-  coding_system: "SNM3"
+  coding_system: "${ALLERGY_CODING_SYSTEM}"
 
 #
 # Diagnoses.
@@ -40,12 +40,12 @@ diagnosis:
   # Reference:
   # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/Default.aspx?version=HL7%20v2.3.1&table=0052
   types:
-    - "A"
-    - "W"
-    - "F"
+    - "${DIAGNOSIS_TYPE_1}"
+    - "${DIAGNOSIS_TYPE_2}"
+    - "${DIAGNOSIS_TYPE_3}"
   # SNOMED International coding system. Reference:
   # http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0396
-  coding_system: "SNM3"
+  coding_system: "${DIAGNOSIS_CODING_SYSTEM}"
 
 #
 # Document type.
@@ -54,20 +54,19 @@ document:
   # Reference:
   # https://hl7-definition.caristix.com/v2/HL7v2.3.1/Tables/0270
   types:
-  - "AR"
-  - "CD"
-  - "CN"
-  - "DI"
-  - "DS"
-  - "ED"
-  - "HP"
-  - "OP"
-  - "PC"
-  - "PH"
-  - "PN"
-  - "PN"
-  - "SP"
-  - "TS"
+  - "${DOCUMENT_TYPE_1}"
+  - "${DOCUMENT_TYPE_2}"
+  - "${DOCUMENT_TYPE_3}"
+  - "${DOCUMENT_TYPE_4}"
+  - "${DOCUMENT_TYPE_5}"
+  - "${DOCUMENT_TYPE_6}"
+  - "${DOCUMENT_TYPE_7}"
+  - "${DOCUMENT_TYPE_8}"
+  - "${DOCUMENT_TYPE_9}"
+  - "${DOCUMENT_TYPE_10}"
+  - "${DOCUMENT_TYPE_11}"
+  - "${DOCUMENT_TYPE_12}"
+  - "${DOCUMENT_TYPE_13}"
 
 #
 # Procedures.
@@ -76,13 +75,13 @@ procedure:
   # Reference:
   # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/Default.aspx?version=HL7%20v2.3.1&table=0230
   types:
-    - "A"
-    - "P"
-    - "I"
-    - "D"
+    - "${PROCEDURE_TYPE_1}"
+    - "${PROCEDURE_TYPE_2}"
+    - "${PROCEDURE_TYPE_3}"
+    - "${PROCEDURE_TYPE_4}"
   # SNOMED International coding system. Reference:
   # http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0396
-  coding_system: "SNM3"
+  coding_system: "${PROCEDURE_CODING_SYSTEM}"
 
 #
 # Order Control.
@@ -90,9 +89,9 @@ procedure:
 # Reference:
 # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/Default.aspx?version=HL7+v2.3.1&table=0119
 order_control:
-  new: "NW"
-  ok: "OK"
-  with_observations: "RE"
+  new: "${ORDER_CONTROL_NEW}"
+  ok: "${ORDER_CONTROL_OK}"
+  with_observations: "${ORDER_CONTROL_WITH_OBSERVATIONS}"
 
 #
 # Result status.
@@ -100,8 +99,8 @@ order_control:
 # Reference:
 # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/Default.aspx?version=HL7%20v2.5.1&table=0123
 result_status:
-  final: "F"
-  corrected: "C"
+  final: "${RESULT_STATUS_FINAL}"
+  corrected: "${RESULT_STATUS_CORRECTED}"
 
 #
 # Document status
@@ -109,7 +108,7 @@ result_status:
 # Reference
 # https://hl7-definition.caristix.com/v2/HL7v2.5.1/Tables/0271
 document_status:
-  authenticated: "AU"
+  authenticated: "${DOCUMENT_STATUS_AUTHENTICATED}"
 
 #
 # Order status.
@@ -117,8 +116,8 @@ document_status:
 # Reference:
 # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/Default.aspx?version=HL7%20v2.5.1&table=0038
 order_status:
-  completed: "CM"
-  in_process: "IP"
+  completed: "${ORDER_STATUS_COMPLETED}"
+  in_process: "${ORDER_STATUS_IN_PROCESS}"
 
 #
 # Patient Class.
@@ -126,18 +125,18 @@ order_status:
 # Reference:
 # http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0004
 patient_class:
-  outpatient: "O"
-  inpatient: "I"
+  outpatient: "${PATIENT_CLASS_OUTPATIENT}"
+  inpatient: "${PATIENT_CLASS_INPATIENT}"
 
 #
 # Patient Account Status.
 #
 # There are no recommended values in HL7; these are user defined.
 patient_account_status:
-  arrived: "ARRIVED"
-  cancelled: "CANCELLED"
-  finished: "FINISHED"
-  planned: "PLANNED"
+  arrived: "${PATIENT_ACCOUNT_STATUS_ARRIVED}"
+  cancelled: "${PATIENT_ACCOUNT_STATUS_CANCELLED}"
+  finished: "${PATIENT_ACCOUNT_STATUS_FINISHED}"
+  planned: "${PATIENT_ACCOUNT_STATUS_PLANNED}"
 
 #
 # Gender.
@@ -145,8 +144,8 @@ patient_account_status:
 # Reference:
 # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/PID?version=HL7%20v2.3.1&table=0001
 gender:
-  male: "M"
-  female: "F"
+  male: "${GENDER_MALE}"
+  female: "${GENDER_FEMALE}"
 
 #
 # Abnormal Flags.
@@ -154,12 +153,12 @@ gender:
 # Reference:
 # http://hl7-definition.caristix.com:9010/HL7%20v2.2/table/Default.aspx?version=HL7+v2.2&table=0078
 abnormal_flags:
-  below_low_normal: "L"
-  above_high_normal: "H"
+  below_low_normal: "${ABNORMAL_FLAGS_BELOW_LOW_NORMAL}"
+  above_high_normal: "${ABNORMAL_FLAGS_ABOVE_HIGH_NORMAL}"
 
 primary_facility:
-  organization_name: "FAMILY PRACTICE"
-  id_number: "12345"
+  organization_name: "${PRIMARY_FACILITY_ORGANIZATION_NAME}"
+  id_number: "${PRIMARY_FACILITY_ID_NUMBER}"
 
 #
 # Hospital Service (PV1.10 - Hospital Service).
@@ -168,30 +167,30 @@ primary_facility:
 # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/PV1?version=HL7%20v2.5.1&table=0069
 #
 # The hospital service value can be overridden by the doctor's specialty.
-hospital_service: "MED"
+hospital_service: "${HOSPITAL_SERVICE}"
 
 #
 # Coding System.
 #
 # WinPath is the UK's leading Laboratory Information Management System.
-coding_system: "WinPath"
+coding_system: "${CODING_SYSTEM}"
 
 #
 # Mapping from HL7 codes to other value sets.
 #
 mapping:
   fhir:
-    coding_systems: { "SNM3": "http://snomed.info/sct" }
+    coding_systems: { "${MAPPING_FHIR_CODING_SYSTEMS_KEY}": "${MAPPING_FHIR_CODING_SYSTEMS_VALUE}" }
     # Reference:
     # https://www.hl7.org/fhir/valueset-reaction-event-severity.html
     allergy_severities:
-      severe: ["SV", "SEVERE"]
-      moderate: ["MO", "MODERATE"]
-      mild: ["MI", "MILD"]
+      severe: ["${MAPPING_FHIR_ALLERGY_SEVERITIES_SEVERE_1}", "${MAPPING_FHIR_ALLERGY_SEVERITIES_SEVERE_2}"]
+      moderate: ["${MAPPING_FHIR_ALLERGY_SEVERITIES_MODERATE_1}", "${MAPPING_FHIR_ALLERGY_SEVERITIES_MODERATE_2}"]
+      mild: ["${MAPPING_FHIR_ALLERGY_SEVERITIES_MILD_1}", "${MAPPING_FHIR_ALLERGY_SEVERITIES_MILD_2}"]
     # Reference:
     # https://www.hl7.org/fhir/valueset-allergy-intolerance-category.html
     allergy_types:
-      food: ["FA", "FOOD"]
-      medication: ["DA", "MEDICATION"]
-      environment: ["EA", "ENVIRONMENTAL"]
-      biologic: ["BIOLOGIC"]
+      food: ["${MAPPING_FHIR_ALLERGY_TYPES_FOOD_1}", "${MAPPING_FHIR_ALLERGY_TYPES_FOOD_2}"]
+      medication: ["${MAPPING_FHIR_ALLERGY_TYPES_MEDICATION_1}", "${MAPPING_FHIR_ALLERGY_TYPES_MEDICATION_2}"]
+      environment: ["${MAPPING_FHIR_ALLERGY_TYPES_ENVIRONMENT_1}", "${MAPPING_FHIR_ALLERGY_TYPES_ENVIRONMENT_2}"]
+      biologic: ["${MAPPING_FHIR_ALLERGY_TYPES_BIOLOGIC}"]
