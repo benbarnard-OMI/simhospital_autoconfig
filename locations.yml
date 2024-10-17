@@ -13,23 +13,23 @@
 # limitations under the License.
 
 ED:
-  poc: ED
-  facility: Simulated Hospital
-  building:
-  floor: 1
-  room: ED
-  type: ED
+  poc: "${LOCATION_ED_POC}"
+  facility: "${LOCATION_ED_FACILITY}"
+  building: "${LOCATION_ED_BUILDING}"
+  floor: "${LOCATION_ED_FLOOR}"
+  room: "${LOCATION_ED_ROOM}"
+  type: "${LOCATION_ED_TYPE}"
 
 Renal:
-  poc: RenalWard
-  facility: Simulated Hospital
-  building: Main Building
-  floor: 5
-  room: MainRoom
+  poc: "${LOCATION_RENAL_POC}"
+  facility: "${LOCATION_RENAL_FACILITY}"
+  building: "${LOCATION_RENAL_BUILDING}"
+  floor: "${LOCATION_RENAL_FLOOR}"
+  room: "${LOCATION_RENAL_ROOM}"
 
 Non-renal:
-  poc: OtherWard
-  facility: Simulated Hospital
-  building: Main Building
-  floor: 4
-  room: MainRoom
+  poc: "${LOCATION_NON_RENAL_POC}"
+  facility: "${LOCATION_NON_RENAL_FACILITY}"
+  building: "${LOCATION_NON_RENAL_BUILDING}"
+  floor: "${LOCATION_NON_RENAL_FLOOR}"
+  room: "${LOCATION_NON_RENAL_ROOM}"

@@ -2,22 +2,14 @@
 # The format of this file is:
 # ID of the CE, Text of the CE, Frequency represented as int.
 # The frequencies have been derived from https://en.wikipedia.org/wiki/Ethnic_groups_in_London
-A,White - British,449
-B,White - Irish,22
-C,White - Other,127
-D,Mixed - White and Black Caribbean,15
-E,Mixed - White and Black African,8
-F,Mixed - White and Asian,12
-G,Mixed - Other,15
-H,Asian or Asian British - Indian,66
-J,Asian or Asian British - Pakistani,27
-K,Asian or Asian British - Bangladeshi,27
-L,Asian or Asian British - Other,49
-M,Black or Black British - Caribbean,42
-N,Black or Black British - African,70
-P,Black or Black British - Other,21
-R,Other - Chinese,15
-S,Any other ethnic group,34
-Z,Not stated,1
+A,White,${ETHNICITY_WHITE_FREQUENCY}
+B,Hispanic or Latino,${ETHNICITY_HISPANIC_LATINO_FREQUENCY}
+C,Black or African American,${ETHNICITY_BLACK_AFRICAN_AMERICAN_FREQUENCY}
+D,Asian,${ETHNICITY_ASIAN_FREQUENCY}
+E,American Indian or Alaska Native,${ETHNICITY_AMERICAN_INDIAN_ALASKA_NATIVE_FREQUENCY}
+F,Native Hawaiian or Other Pacific Islander,${ETHNICITY_NATIVE_HAWAIIAN_PACIFIC_ISLANDER_FREQUENCY}
+G,Other,${ETHNICITY_OTHER_FREQUENCY}
+H,Two or More Races,${ETHNICITY_TWO_OR_MORE_RACES_FREQUENCY}
+Z,Not Stated,${ETHNICITY_NOT_STATED_FREQUENCY}
 # This "nil,nil" row is interpreted as an absent ethnicity.
-nil,nil,2
+nil,nil,${ETHNICITY_ABSENT_FREQUENCY}
