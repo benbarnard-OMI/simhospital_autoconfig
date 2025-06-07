@@ -1,0 +1,14 @@
+ED:
+  poc: COOK COUNTY
+  facility: CHICAGO, IL
+  building: Main Building
+  floor: 1st Floor
+  room: ED-101
+  type: EMERGENCY
+  description: Emergency Department at COOK COUNTY
+  address:
+    street: 1901 W HARRISON ST
+    city: CHICAGO
+    state: IL
+    zip: '606123714'
+    country: United States
