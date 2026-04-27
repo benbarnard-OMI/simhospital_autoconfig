@@ -159,7 +159,7 @@ abnormal_flags:
 
 primary_facility:
   organization_name: "FAMILY PRACTICE"
-  id_number: "12345"
+  id_number: "${PRIMARY_FACILITY_ID}"
 
 #
 # Hospital Service (PV1.10 - Hospital Service).
