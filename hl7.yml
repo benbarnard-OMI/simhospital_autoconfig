@@ -158,8 +158,8 @@ abnormal_flags:
   above_high_normal: "H"
 
 primary_facility:
-  organization_name: "FAMILY PRACTICE"
-  id_number: "12345"
+  organization_name: "${ORGANIZATION_NAME}"
+  id_number: "${ORGANIZATION_ID}"
 
 #
 # Hospital Service (PV1.10 - Hospital Service).
