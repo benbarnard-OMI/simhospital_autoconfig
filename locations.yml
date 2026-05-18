@@ -14,7 +14,7 @@
 
 ED:
   poc: ED
-  facility: Simulated Hospital
+  facility: "${ORGANIZATION_NAME}"
   building:
   floor: 1
   room: ED
@@ -22,14 +22,14 @@ ED:
 
 Renal:
   poc: RenalWard
-  facility: Simulated Hospital
+  facility: "${ORGANIZATION_NAME}"
   building: Main Building
   floor: 5
   room: MainRoom
 
 Non-renal:
   poc: OtherWard
-  facility: Simulated Hospital
+  facility: "${ORGANIZATION_NAME}"
   building: Main Building
   floor: 4
   room: MainRoom
