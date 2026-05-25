@@ -17,20 +17,20 @@
 #
 allergy:
   # Reference:
-  # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/Default.aspx?version=HL7%20v2.3.1&table=0127
+  # https://hl7-definition.caristix.com/v2/HL7v2.3.1/Tables/0127
   types:
     - "DA"
     - "FA"
     - "MA"
     - "MC"
   # Reference:
-  # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/Default.aspx?version=HL7%20v2.3.1&table=0128
+  # https://hl7-definition.caristix.com/v2/HL7v2.3.1/Tables/0128
   severities:
     - "SV"
     - "MO"
     - "MI"
   # SNOMED International coding system. Reference:
-  # http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0396
+  # https://hl7-definition.caristix.com/v2/HL7v2.5.1/Tables/0396
   coding_system: "SNM3"
 
 #
@@ -38,13 +38,13 @@ allergy:
 #
 diagnosis:
   # Reference:
-  # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/Default.aspx?version=HL7%20v2.3.1&table=0052
+  # https://hl7-definition.caristix.com/v2/HL7v2.3.1/Tables/0052
   types:
     - "A"
     - "W"
     - "F"
   # SNOMED International coding system. Reference:
-  # http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0396
+  # https://hl7-definition.caristix.com/v2/HL7v2.5.1/Tables/0396
   coding_system: "SNM3"
 
 #
@@ -73,21 +73,21 @@ document:
 #
 procedure:
   # Reference:
-  # http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/Default.aspx?version=HL7%20v2.3.1&table=0230
+  # https://hl7-definition.caristix.com/v2/HL7v2.3.1/Tables/0230
   types:
     - "A"
     - "P"
     - "I"
     - "D"
   # SNOMED International coding system. Reference:
-  # http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0396
+  # https://hl7-definition.caristix.com/v2/HL7v2.5.1/Tables/0396
   coding_system: "SNM3"
 
 #
 # Order Control.
 #
 # Reference:
-# http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/Default.aspx?version=HL7+v2.3.1&table=0119
+# https://hl7-definition.caristix.com/v2/HL7v2.3.1/Tables/0119
 order_control:
   new: "NW"
   ok: "OK"
@@ -97,7 +97,7 @@ order_control:
 # Result status.
 #
 # Reference:
-# http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/Default.aspx?version=HL7%20v2.5.1&table=0123
+# https://hl7-definition.caristix.com/v2/HL7v2.5.1/Tables/0123
 result_status:
   final: "F"
   corrected: "C"
@@ -114,7 +114,7 @@ document_status:
 # Order status.
 #
 # Reference:
-# http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/Default.aspx?version=HL7%20v2.5.1&table=0038
+# https://hl7-definition.caristix.com/v2/HL7v2.5.1/Tables/0038
 order_status:
   completed: "CM"
   in_process: "IP"
@@ -123,7 +123,7 @@ order_status:
 # Patient Class.
 #
 # Reference:
-# http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0004
+# https://hl7-definition.caristix.com/v2/HL7v2.5.1/Tables/0004
 patient_class:
   outpatient: "O"
   inpatient: "I"
@@ -142,7 +142,7 @@ patient_account_status:
 # Gender.
 #
 # Reference:
-# http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/PID?version=HL7%20v2.3.1&table=0001
+# https://hl7-definition.caristix.com/v2/HL7v2.3.1/Tables/0001
 gender:
   male: "M"
   female: "F"
@@ -151,7 +151,7 @@ gender:
 # Abnormal Flags.
 #
 # Reference:
-# http://hl7-definition.caristix.com:9010/HL7%20v2.2/table/Default.aspx?version=HL7+v2.2&table=0078
+# https://hl7-definition.caristix.com/v2/HL7v2.2/Tables/0078
 abnormal_flags:
   below_low_normal: "L"
   above_high_normal: "H"
@@ -164,7 +164,7 @@ primary_facility:
 # Hospital Service (PV1.10 - Hospital Service).
 #
 # Reference:
-# http://hl7-definition.caristix.com:9010/HL7%20v2.3.1/segment/PV1?version=HL7%20v2.5.1&table=0069
+# https://hl7-definition.caristix.com/v2/HL7v2.5.1/Tables/0069
 #
 # The hospital service value can be overridden by the doctor's specialty.
 hospital_service: "MED"
