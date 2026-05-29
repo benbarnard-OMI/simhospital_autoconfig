@@ -197,6 +197,8 @@ function processHl7YML(hospital) {
   }
 
   content = content.replace(/hospital_service: "MED"/g, `hospital_service: "${hospitalService}"`);
+  content = content.replace(/organization_name: "\$\{ORGANIZATION_NAME\}"/g, `organization_name: "${hospital.name}"`);
+  content = content.replace(/id_number: "\$\{ORGANIZATION_ID\}"/g, `id_number: "${hospital.npi}"`);
 
   return content;
 }
