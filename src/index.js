@@ -131,7 +131,7 @@ program
       if (hospital.identifiers.length > 0) {
         console.log('Identifiers:');
         hospital.identifiers.forEach(id => {
-          console.log(`  - ${id.desc}: ${id.identifier} (${id.state})`);
+          console.log(`  - ${id.code}: ${id.identifier} (${id.state})`);
         });
       }
 

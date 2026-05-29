@@ -1,0 +1,27 @@
+{
+  "npi": "1730209545",
+  "name": "COOK COUNTY",
+  "address": {
+    "street": "1901 W HARRISON ST",
+    "street2": "",
+    "city": "CHICAGO",
+    "state": "IL",
+    "postalCode": "606123714",
+    "country": "US"
+  },
+  "taxonomy": {
+    "code": "282N00000X",
+    "description": "General Acute Care Hospital",
+    "license": "0005272"
+  },
+  "identifiers": [
+    {
+      "code": "05",
+      "identifier": "=========1473",
+      "state": "IL"
+    }
+  ],
+  "phone": "312-864-5500",
+  "createdDate": "2007-03-29",
+  "lastUpdated": "2020-08-22"
+}

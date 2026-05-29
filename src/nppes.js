@@ -43,7 +43,7 @@ export async function fetchHospitalByNpi(npi) {
     throw new Error(`No hospital found with NPI: ${validatedNpi}`);
   }
 
-  return parseHospitalData(results[0]);
+  return results[0];
 }
 
 export async function fetchPractitionersByNpi(npi, limit = 100) {
@@ -94,15 +94,17 @@ export async function fetchPractitionersForHospital(npi) {
 }
 
 export function parseHospitalData(raw) {
+  const basic = raw.basic || {};
   const address = raw.addresses?.find(a => a.address_purpose === 'LOCATION') || {};
-
   const taxonomy = raw.taxonomies?.find(t => t.primary) || raw.taxonomies?.[0] || {};
 
-  const identifier = raw.identifiers?.find(i => i.desc === 'MEDICAID') || {};
+  const orgName = basic.organization_name || (basic.authorized_official_first_name && basic.authorized_official_last_name
+    ? `${basic.authorized_official_first_name} ${basic.authorized_official_last_name}`
+    : 'Unknown Hospital');
 
   return {
-    npi: raw.number,
-    name: raw.organization_name || 'Unknown Hospital',
+    npi: String(raw.number || ''),
+    name: orgName,
     address: {
       street: address.address_1 || '',
       street2: address.address_2 || '',
@@ -122,8 +124,8 @@ export function parseHospitalData(raw) {
       state: id.state
     })) || [],
     phone: address.telephone_number || '',
-    createdDate: raw.created_date || '',
-    lastUpdated: raw.last_updated || ''
+    createdDate: basic.enumeration_date || '',
+    lastUpdated: basic.last_updated || ''
   };
 }
 

@@ -151,17 +151,29 @@ function processDataYML(hospital) {
 }
 
 function processDoctorsYML(doctors) {
-  let content = fs.readFileSync(path.join(TEMPLATE_DIR, 'doctors.yml'), 'utf8');
-  const lines = content.split('\n');
-  const headerEnd = lines.findIndex(l => l.startsWith('- id:'));
-  if (headerEnd === -1) return content;
+  const header = `# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-  const header = lines.slice(0, headerEnd).join('\n');
+# Specialties come from
+# http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0069
+`;
+
   const doctorLines = doctors.map(d =>
     `- id: "${d.id}"\n  surname: "${d.surname}"\n  firstname: "${d.firstname}"\n  prefix: "${d.prefix}"\n  specialty: "${d.specialty}"`
   ).join('\n');
 
-  return header + '\n' + doctorLines + '\n';
+  return header + doctorLines + '\n';
 }
 
 function processHl7YML(hospital) {
@@ -190,17 +202,26 @@ function processHl7YML(hospital) {
 }
 
 function processLocationsYML(locations) {
-  let content = fs.readFileSync(path.join(TEMPLATE_DIR, 'locations.yml'), 'utf8');
-  const lines = content.split('\n');
-  const headerEnd = lines.findIndex(l => l.match(/^[A-Z][a-z]+:/));
-  if (headerEnd === -1) return content;
+  const header = `# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+`;
 
-  const header = lines.slice(0, headerEnd).join('\n');
   const locationLines = Object.entries(locations).map(([key, loc]) =>
     `${key}:\n  poc: ${loc.poc}\n  facility: "${loc.facility}"\n  building: ${loc.building}\n  floor: ${loc.floor}\n  room: ${loc.room}\n  type: ${loc.type}`
   ).join('\n');
 
-  return header + '\n' + locationLines + '\n';
+  return header + locationLines + '\n';
 }
 
 function processEthnicityCSV(demographics) {

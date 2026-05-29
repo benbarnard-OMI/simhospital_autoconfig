@@ -5,7 +5,11 @@ import { parseHospitalData, parsePractitionerData } from './nppes.js';
 describe('NPPES Parser', () => {
   const sampleHospitalResponse = {
     number: '1730209545',
-    organization_name: 'STROGER HOSPITAL',
+    basic: {
+      organization_name: 'COOK COUNTY',
+      enumeration_date: '2007-01-01',
+      last_updated: '2023-01-15'
+    },
     addresses: [{
       address_purpose: 'LOCATION',
       address_1: '1901 W HARRISON ST',
@@ -28,16 +32,14 @@ describe('NPPES Parser', () => {
       desc: 'MEDICAID',
       identifier: '1473',
       state: 'IL'
-    }],
-    created_date: '2007-01-01',
-    last_updated: '2023-01-15'
+    }]
   };
 
   test('parseHospitalData extracts correct fields', () => {
     const result = parseHospitalData(sampleHospitalResponse);
 
     assert.strictEqual(result.npi, '1730209545');
-    assert.strictEqual(result.name, 'STROGER HOSPITAL');
+    assert.strictEqual(result.name, 'COOK COUNTY');
     assert.strictEqual(result.address.city, 'CHICAGO');
     assert.strictEqual(result.address.state, 'IL');
     assert.strictEqual(result.address.postalCode, '60612');
