@@ -12,9 +12,14 @@ function validateNpi(npi) {
 
 function calculateNpiChecksum(npi) {
   const digits = npi.split('').map(Number);
-  const doubled = digits.map((d, i) => i % 2 === 0 ? d * 2 : d);
-  const sum = doubled.reduce((acc, d) => acc + (d > 9 ? d - 9 : d), 0);
-  return (100 - sum) % 10 === parseInt(npi[9]);
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    const digit = digits[i];
+    const doubled = (i % 2 === 1) ? digit * 2 : digit;
+    sum += doubled > 9 ? doubled - 9 : doubled;
+  }
+  const checkDigit = (100 - sum) % 10;
+  return checkDigit === digits[9];
 }
 
 export async function fetchHospitalByNpi(npi) {
