@@ -59,9 +59,11 @@ describe('NPPES Parser', () => {
 
   const samplePractitionerResponse = {
     number: '1234567891',
-    first_name: 'John',
-    last_name: 'Smith',
-    credential: 'MD',
+    basic: {
+      first_name: 'John',
+      last_name: 'Smith',
+      credential: 'MD'
+    },
     addresses: [{
       address_purpose: 'LOCATION',
       city: 'CHICAGO',

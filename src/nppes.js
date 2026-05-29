@@ -2,6 +2,20 @@ import axios from 'axios';
 
 const NPPES_BASE_URL = 'https://npiregistry.cms.hhs.gov/api/';
 
+const STATE_TO_FIPS = {
+  'AL': '01', 'AK': '02', 'AZ': '04', 'AR': '05', 'CA': '06',
+  'CO': '08', 'CT': '09', 'DE': '10', 'FL': '12', 'GA': '13',
+  'HI': '15', 'ID': '16', 'IL': '17', 'IN': '18', 'IA': '19',
+  'KS': '20', 'KY': '21', 'LA': '22', 'ME': '23', 'MD': '24',
+  'MA': '25', 'MI': '26', 'MN': '27', 'MS': '28', 'MO': '29',
+  'MT': '30', 'NE': '31', 'NV': '32', 'NH': '33', 'NJ': '34',
+  'NM': '35', 'NY': '36', 'NC': '37', 'ND': '38', 'OH': '39',
+  'OK': '40', 'OR': '41', 'PA': '42', 'RI': '44', 'SC': '45',
+  'SD': '46', 'TN': '47', 'TX': '48', 'UT': '49', 'VT': '50',
+  'VA': '51', 'WA': '53', 'WV': '54', 'WI': '55', 'WY': '56',
+  'DC': '11', 'PR': '72'
+};
+
 function validateNpi(npi) {
   const cleaned = npi.toString().replace(/\D/g, '');
   if (cleaned.length !== 10) {
@@ -67,28 +81,46 @@ export async function fetchPractitionersForHospital(npi) {
   const validatedNpi = validateNpi(npi);
 
   try {
-    const response = await axios.get(NPPES_BASE_URL, {
+    const hospitalRaw = await axios.get(NPPES_BASE_URL, {
       params: {
-        limit: 200,
+        number: validatedNpi,
+        enumeration_type: 'NPI-2',
         pretty: true,
         version: '2.1'
       }
     });
 
-    const allResults = response.data.results || [];
+    const hospitalData = hospitalRaw.data.results?.[0];
+    if (!hospitalData) return [];
 
+    const hospitalAddress = hospitalData.addresses?.find(a => a.address_purpose === 'LOCATION');
+    const hospitalState = hospitalAddress?.state;
+    const hospitalCity = hospitalAddress?.city;
+    const hospitalZip = hospitalAddress?.postal_code?.split('-')[0];
+
+    const response = await axios.get(NPPES_BASE_URL, {
+      params: {
+        postal_code: hospitalZip,
+        pretty: true,
+        version: '2.1',
+        limit: 200
+      }
+    });
+
+    const allResults = response.data.results || [];
     const hospitalNpiNum = parseInt(validatedNpi);
 
     return allResults
       .filter(r => {
-        const taxonomies = r.taxonomies || [];
-        const isPractitioner = r.enumeration_type !== 'NPI-2';
-        const hasRelatedHospital = r.parent_organization_legacy_number === hospitalNpiNum ||
-                                  r.created_date === new Date().toISOString().split('T')[0];
-        return isPractitioner;
+        if (r.enumeration_type === 'NPI-2') return false;
+        if (r.parent_organization_legacy_number === hospitalNpiNum) return true;
+        const addr = r.addresses?.find(a => a.address_purpose === 'LOCATION');
+        if (addr?.state === hospitalState && addr?.city === hospitalCity) return true;
+        return false;
       })
       .map(parsePractitionerData);
   } catch (error) {
+    console.log('Practitioner fetch error:', error.message);
     return [];
   }
 }
@@ -130,15 +162,19 @@ export function parseHospitalData(raw) {
 }
 
 export function parsePractitionerData(raw) {
+  const basic = raw.basic || {};
   const address = raw.addresses?.find(a => a.address_purpose === 'LOCATION') || {};
   const taxonomy = raw.taxonomies?.find(t => t.primary) || raw.taxonomies?.[0] || {};
 
+  const firstName = basic.first_name || '';
+  const lastName = basic.last_name || '';
+
   return {
-    npi: raw.number,
-    name: `${raw.first_name || ''} ${raw.last_name || ''}`.trim(),
-    firstName: raw.first_name || '',
-    lastName: raw.last_name || '',
-    prefix: raw.credential || '',
+    npi: String(raw.number || ''),
+    name: `${firstName} ${lastName}`.trim() || 'Unknown',
+    firstName,
+    lastName,
+    prefix: basic.credential || 'Dr',
     specialty: taxonomy.code?.substring(0, 3) || 'MED',
     specialtyDescription: taxonomy.desc || '',
     address: {

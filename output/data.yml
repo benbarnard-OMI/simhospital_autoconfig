@@ -125,11 +125,11 @@ address:
     - "HAMBURG"
   streets:
     - Street
+    - Street
+    - Lane
+    - Avenue
     - Place
-    - Street
-    - Drive
     - Court
-    - Street
   country: "USA"
   types:
     - "H"
