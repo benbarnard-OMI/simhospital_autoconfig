@@ -1,6 +1,7 @@
 {
   "name": "simhospital-autoconfig",
   "version": "1.0.0",
+  "type": "module",
   "description": "Automatically configure Google Simhospital to reflect real-world hospital traits",
   "main": "src/index.js",
   "scripts": {
