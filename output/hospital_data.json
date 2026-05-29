@@ -1,27 +1,21 @@
 {
-  "npi": "1730209545",
-  "name": "COOK COUNTY",
+  "npi": "1932294071",
+  "name": "COMMUNITY HOSPITAL INC",
   "address": {
-    "street": "1901 W HARRISON ST",
+    "street": "2959 US HIGHWAY 275",
     "street2": "",
-    "city": "CHICAGO",
-    "state": "IL",
-    "postalCode": "606123714",
+    "city": "HAMBURG",
+    "state": "IA",
+    "postalCode": "516405052",
     "country": "US"
   },
   "taxonomy": {
-    "code": "282N00000X",
-    "description": "General Acute Care Hospital",
-    "license": "0005272"
+    "code": "282NC0060X",
+    "description": "General Acute Care Hospital, Critical Access",
+    "license": "360067H"
   },
-  "identifiers": [
-    {
-      "code": "05",
-      "identifier": "=========1473",
-      "state": "IL"
-    }
-  ],
-  "phone": "312-864-5500",
-  "createdDate": "2007-03-29",
-  "lastUpdated": "2020-08-22"
+  "identifiers": [],
+  "phone": "712-382-1515",
+  "createdDate": "2006-10-04",
+  "lastUpdated": "2022-06-01"
 }

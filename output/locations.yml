@@ -13,28 +13,28 @@
 # limitations under the License.
 ED:
   poc: ED
-  facility: "COOK COUNTY"
+  facility: "COMMUNITY HOSPITAL INC"
   building: Main Building
   floor: 1
   room: ED
   type: ED
 ICU:
   poc: ICU
-  facility: "COOK COUNTY"
+  facility: "COMMUNITY HOSPITAL INC"
   building: Main Building
   floor: 2
   room: ICU-1
   type: ICU
 OR:
   poc: Surgery
-  facility: "COOK COUNTY"
+  facility: "COMMUNITY HOSPITAL INC"
   building: Surgical Wing
   floor: 3
   room: OR-1
   type: OR
 General:
   poc: General Ward
-  facility: "COOK COUNTY"
+  facility: "COMMUNITY HOSPITAL INC"
   building: Main Building
   floor: 3
   room: Ward-3A

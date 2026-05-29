@@ -118,18 +118,18 @@ patient_name:
 address:
   # Subset of London post towns from: https://en.wikipedia.org/wiki/List_of_areas_of_London
   cities:
-    - "CHICAGO"
-    - "CHICAGO"
-    - "CHICAGO"
-    - "CHICAGO"
-    - "CHICAGO"
+    - "HAMBURG"
+    - "HAMBURG"
+    - "HAMBURG"
+    - "HAMBURG"
+    - "HAMBURG"
   streets:
-    - Lane
-    - Avenue
-    - Place
-    - Drive
     - Street
+    - Place
+    - Street
+    - Drive
     - Court
+    - Street
   country: "USA"
   types:
     - "H"
