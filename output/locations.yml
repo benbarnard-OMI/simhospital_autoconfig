@@ -13,29 +13,106 @@
 # limitations under the License.
 ED:
   poc: ED
-  facility: "COMMUNITY HOSPITAL INC"
+  facility: "COOK COUNTY"
   building: Main Building
   floor: 1
   room: ED
   type: ED
 ICU:
   poc: ICU
-  facility: "COMMUNITY HOSPITAL INC"
+  facility: "COOK COUNTY"
   building: Main Building
   floor: 2
   room: ICU-1
   type: ICU
 OR:
   poc: Surgery
-  facility: "COMMUNITY HOSPITAL INC"
+  facility: "COOK COUNTY"
   building: Surgical Wing
   floor: 3
   room: OR-1
   type: OR
-General:
-  poc: General Ward
-  facility: "COMMUNITY HOSPITAL INC"
+PACU:
+  poc: Post Anesthesia Care
+  facility: "COOK COUNTY"
+  building: Surgical Wing
+  floor: 3
+  room: PACU
+  type: PACU
+L&D:
+  poc: Labor & Delivery
+  facility: "COOK COUNTY"
+  building: Women's Center
+  floor: 4
+  room: LDR-1
+  type: L&D
+NICU:
+  poc: Neonatal ICU
+  facility: "COOK COUNTY"
+  building: Women's Center
+  floor: 4
+  room: NICU
+  type: NICU
+PICU:
+  poc: Pediatric ICU
+  facility: "COOK COUNTY"
+  building: Pediatrics
+  floor: 5
+  room: PICU
+  type: PICU
+Telemetry:
+  poc: Telemetry
+  facility: "COOK COUNTY"
   building: Main Building
   floor: 3
+  room: Tele-1
+  type: Telemetry
+Dialysis:
+  poc: Dialysis
+  facility: "COOK COUNTY"
+  building: Medical Tower
+  floor: 4
+  room: Dialysis-1
+  type: Dialysis
+Oncology:
+  poc: Oncology
+  facility: "COOK COUNTY"
+  building: Cancer Center
+  floor: 2
+  room: Infusion-1
+  type: Oncology
+Rehab:
+  poc: Rehabilitation
+  facility: "COOK COUNTY"
+  building: Rehab Center
+  floor: 1
+  room: PT-1
+  type: Rehab
+General:
+  poc: General Ward
+  facility: "COOK COUNTY"
+  building: Main Building
+  floor: 5
   room: Ward-3A
   type: Ward
+Pharmacy:
+  poc: Pharmacy
+  facility: "COOK COUNTY"
+  building: Main Building
+  floor: 1
+  room: Pharmacy
+  type: Pharmacy
+Lab:
+  poc: Laboratory
+  facility: "COOK COUNTY"
+  building: Main Building
+  floor: 1
+  room: Lab-1
+  type: Lab
+Radiology:
+  poc: Radiology
+  facility: "COOK COUNTY"
+  building: Main Building
+  floor: 1
+  room: X-Ray
+  type: Radiology

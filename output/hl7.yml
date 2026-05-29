@@ -157,8 +157,8 @@ abnormal_flags:
   above_high_normal: "H"
 
 primary_facility:
-  organization_name: "COMMUNITY HOSPITAL INC"
-  id_number: "1932294071"
+  organization_name: "COOK COUNTY"
+  id_number: "1730209545"
 
 #
 # Hospital Service (PV1.10 - Hospital Service).

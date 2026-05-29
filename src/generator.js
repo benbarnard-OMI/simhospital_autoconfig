@@ -8,26 +8,63 @@ const TEMPLATE_DIR = './templates';
 const OUTPUT_DIR = './output';
 
 const SPECIALTY_MAP = {
-  '282': 'MED',
-  '207': 'MED',
-  '208': 'MED',
-  '204': 'MED',
-  '281': 'MED',
-  '206': 'SUR',
-  '208': 'SUR',
-  '202': 'SUR',
-  '203': 'SUR',
-  '207Q': 'MED',
-  '207R': 'MED',
-  '207X': 'MED',
-  '208D': 'MED',
-  '208M': 'MED'
+  '282': 'MED', '207': 'MED', '208': 'MED', '204': 'MED', '281': 'MED',
+  '206': 'SUR', '202': 'SUR', '203': 'SUR',
+  '207Q': 'MED', '207R': 'MED', '207X': 'MED', '208D': 'MED', '208M': 'MED',
+  '207K': 'PUL', '207P': 'EMG', '207R': 'MED', '208X': 'MED',
+  '204E': 'PUL', '208X': 'PUL',
+  '201': 'SUR',
+  '200': 'RAD',
+  '202': 'ANES',
+  '290': 'LAB',
+  '293': 'RAD',
+  '300': 'RAD',
+  '207L': 'ANES',
+  '208I': 'CAR',
+  '207V': 'OBG',
+  '208G': 'SUR',
+  '208S': 'SUR',
+  '208C': 'SUR',
+  '207W': 'OPH',
+  '207Y': 'OTO',
+  '207Z': 'DER',
+  '208H': 'SUR',
+  '208K': 'MED',
+  '208U': 'MED',
+  '207S': 'MED',
+  '209': 'MED',
+  '211': 'MED',
+  '212': 'MED'
 };
 
+const HL7_SPECIALTIES = ['MED', 'SUR', 'PUL', 'CAR', 'OBG', 'RAD', 'ANES', 'EMG', 'OPH', 'OTO', 'DER', 'NER', 'PSY', 'ORS', 'URO'];
+
 function mapSpecialtyToHL7(code) {
-  if (!code) return 'MED';
+  if (!code) return HL7_SPECIALTIES[Math.floor(Math.random() * 3)]; // Default to common
   const prefix = code.substring(0, 3);
-  return SPECIALTY_MAP[prefix] || 'MED';
+  return SPECIALTY_MAP[prefix] || HL7_SPECIALTIES[Math.floor(Math.random() * HL7_SPECIALTIES.length)];
+}
+
+function generateAdditionalDoctors(hospital, count = 10) {
+  const firstNames = ['James', 'Mary', 'Robert', 'Patricia', 'John', 'Jennifer', 'Michael', 'Linda', 'David', 'Elizabeth', 'William', 'Barbara', 'Richard', 'Susan', 'Joseph', 'Jessica', 'Thomas', 'Sarah', 'Christopher', 'Karen', 'Charles', 'Lisa', 'Daniel', 'Nancy', 'Matthew', 'Betty', 'Anthony', 'Margaret', 'Mark', 'Sandra'];
+  const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Anderson', 'Taylor', 'Thomas', 'Moore', 'Jackson', 'Martin', 'Lee', 'Thompson', 'White', 'Harris', 'Clark', 'Lewis', 'Robinson', 'Walker', 'Young', 'Allen', 'King', 'Wright', 'Scott', 'Torres'];
+  const credentials = ['MD', 'MD', 'MD', 'DO', 'MD', 'NP', 'PA', 'MD', 'RN', 'MD'];
+
+  const doctors = [];
+  for (let i = 0; i < count; i++) {
+    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const specialty = HL7_SPECIALTIES[Math.floor(Math.random() * HL7_SPECIALTIES.length)];
+
+    doctors.push({
+      id: `D${String(i + 1).padStart(3, '0')}`,
+      surname: lastName,
+      firstname: firstName,
+      prefix: credentials[Math.floor(Math.random() * credentials.length)],
+      specialty
+    });
+  }
+  return doctors;
 }
 
 function generatePatientAddresses(state, city) {
@@ -52,24 +89,40 @@ function generatePatientAddresses(state, city) {
 }
 
 function generateDoctors(practitioners, hospital) {
-  if (!practitioners || practitioners.length === 0) {
-    return [
-      { id: 'D001', surname: hospital.name.substring(0, 8) || 'Hospital', firstname: 'Chief', prefix: 'Dr', specialty: 'MED' },
-      { id: 'D002', surname: 'Smith', firstname: 'Elizabeth', prefix: 'Dr', specialty: 'SUR' },
-      { id: 'D003', surname: 'Johnson', firstname: 'Robert', prefix: 'Dr', specialty: 'MED' }
-    ];
-  }
+  const MIN_DOCTORS = 15;
+  const MAX_DOCTORS = 50;
 
-  return practitioners.slice(0, 20).map((p, idx) => ({
+  const isLargeHospital = hospital.taxonomy?.code?.startsWith('282N');
+
+  const maxToTake = isLargeHospital ? 40 : 20;
+
+  // Start with real practitioners from NPI
+  const realDoctors = (practitioners || []).slice(0, maxToTake).map((p, idx) => ({
     id: `D${String(idx + 1).padStart(3, '0')}`,
-    surname: p.lastName || p.name?.split(' ').pop() || 'Unknown',
-    firstname: p.firstName || p.name?.split(' ')[0] || 'Doctor',
-    prefix: 'Dr',
+    surname: p.lastName || 'Unknown',
+    firstname: p.firstName || 'Doctor',
+    prefix: p.prefix || 'Dr',
     specialty: mapSpecialtyToHL7(p.specialty)
   }));
+
+  // Fill in with generated doctors to reach minimum
+  const targetCount = isLargeHospital ? MAX_DOCTORS : MIN_DOCTORS;
+  const generatedCount = Math.max(0, targetCount - realDoctors.length);
+  const generatedDoctors = generateAdditionalDoctors(hospital, generatedCount);
+
+  // Renumber all doctors sequentially
+  const allDoctors = [...realDoctors, ...generatedDoctors].map((d, idx) => ({
+    ...d,
+    id: `D${String(idx + 1).padStart(3, '0')}`
+  }));
+
+  return allDoctors;
 }
 
 function generateLocations(taxonomyCode, hospital) {
+  const isCriticalAccess = taxonomyCode?.includes('NC0060') || taxonomyCode?.includes('282NC');
+  const isLargeHospital = taxonomyCode?.startsWith('282N') && !isCriticalAccess;
+
   const locations = {
     'ED': {
       poc: 'ED',
@@ -78,49 +131,32 @@ function generateLocations(taxonomyCode, hospital) {
       floor: 1,
       room: 'ED',
       type: 'ED'
-    },
-    'ICU': {
-      poc: 'ICU',
-      facility: hospital.name,
-      building: 'Main Building',
-      floor: 2,
-      room: 'ICU-1',
-      type: 'ICU'
     }
   };
 
-  const primaryService = taxonomyCode?.startsWith('282') ? 'MED' : 'MED';
-
-  if (taxonomyCode?.includes('281') || taxonomyCode?.includes('282')) {
-    locations['OR'] = {
-      poc: 'Surgery',
-      facility: hospital.name,
-      building: 'Surgical Wing',
-      floor: 3,
-      room: 'OR-1',
-      type: 'OR'
-    };
+  if (isLargeHospital) {
+    locations['ICU'] = { poc: 'ICU', facility: hospital.name, building: 'Main Building', floor: 2, room: 'ICU-1', type: 'ICU' };
+    locations['OR'] = { poc: 'Surgery', facility: hospital.name, building: 'Surgical Wing', floor: 3, room: 'OR-1', type: 'OR' };
+    locations['PACU'] = { poc: 'Post Anesthesia Care', facility: hospital.name, building: 'Surgical Wing', floor: 3, room: 'PACU', type: 'PACU' };
+    locations['L&D'] = { poc: 'Labor & Delivery', facility: hospital.name, building: 'Women\'s Center', floor: 4, room: 'LDR-1', type: 'L&D' };
+    locations['NICU'] = { poc: 'Neonatal ICU', facility: hospital.name, building: 'Women\'s Center', floor: 4, room: 'NICU', type: 'NICU' };
+    locations['PICU'] = { poc: 'Pediatric ICU', facility: hospital.name, building: 'Pediatrics', floor: 5, room: 'PICU', type: 'PICU' };
+    locations['Telemetry'] = { poc: 'Telemetry', facility: hospital.name, building: 'Main Building', floor: 3, room: 'Tele-1', type: 'Telemetry' };
+    locations['Dialysis'] = { poc: 'Dialysis', facility: hospital.name, building: 'Medical Tower', floor: 4, room: 'Dialysis-1', type: 'Dialysis' };
+    locations['Oncology'] = { poc: 'Oncology', facility: hospital.name, building: 'Cancer Center', floor: 2, room: 'Infusion-1', type: 'Oncology' };
+    locations['Rehab'] = { poc: 'Rehabilitation', facility: hospital.name, building: 'Rehab Center', floor: 1, room: 'PT-1', type: 'Rehab' };
+  } else if (!isCriticalAccess) {
+    locations['ICU'] = { poc: 'ICU', facility: hospital.name, building: 'Main Building', floor: 2, room: 'ICU-1', type: 'ICU' };
+    locations['OR'] = { poc: 'Surgery', facility: hospital.name, building: 'Surgical Wing', floor: 2, room: 'OR-1', type: 'OR' };
+    locations['L&D'] = { poc: 'Labor & Delivery', facility: hospital.name, building: 'Women\'s Center', floor: 3, room: 'LDR-1', type: 'L&D' };
+    locations['Telemetry'] = { poc: 'Telemetry', facility: hospital.name, building: 'Main Building', floor: 2, room: 'Tele-1', type: 'Telemetry' };
+    locations['Dialysis'] = { poc: 'Dialysis', facility: hospital.name, building: 'Medical Wing', floor: 2, room: 'Dialysis-1', type: 'Dialysis' };
   }
 
-  if (taxonomyCode?.includes('281') || taxonomyCode?.includes('287')) {
-    locations['Renal'] = {
-      poc: 'Nephrology',
-      facility: hospital.name,
-      building: 'Medical Tower',
-      floor: 4,
-      room: 'Dialysis-1',
-      type: 'Renal'
-    };
-  }
-
-  locations['General'] = {
-    poc: 'General Ward',
-    facility: hospital.name,
-    building: 'Main Building',
-    floor: 3,
-    room: 'Ward-3A',
-    type: 'Ward'
-  };
+  locations['General'] = { poc: 'General Ward', facility: hospital.name, building: 'Main Building', floor: isLargeHospital ? 5 : 3, room: 'Ward-3A', type: 'Ward' };
+  locations['Pharmacy'] = { poc: 'Pharmacy', facility: hospital.name, building: 'Main Building', floor: 1, room: 'Pharmacy', type: 'Pharmacy' };
+  locations['Lab'] = { poc: 'Laboratory', facility: hospital.name, building: 'Main Building', floor: 1, room: 'Lab-1', type: 'Lab' };
+  locations['Radiology'] = { poc: 'Radiology', facility: hospital.name, building: 'Main Building', floor: 1, room: 'X-Ray', type: 'Radiology' };
 
   return locations;
 }

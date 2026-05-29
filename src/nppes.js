@@ -98,19 +98,48 @@ export async function fetchPractitionersForHospital(npi) {
     const hospitalCity = hospitalAddress?.city;
     const hospitalZip = hospitalAddress?.postal_code?.split('-')[0];
 
-    const response = await axios.get(NPPES_BASE_URL, {
-      params: {
-        postal_code: hospitalZip,
-        pretty: true,
-        version: '2.1',
-        limit: 200
-      }
-    });
+    const allPractitioners = [];
 
-    const allResults = response.data.results || [];
+    // Try city + state search
+    try {
+      const cityResponse = await axios.get(NPPES_BASE_URL, {
+        params: {
+          city: hospitalCity,
+          state: hospitalState,
+          pretty: true,
+          version: '2.1',
+          limit: 500
+        }
+      });
+      const cityResults = cityResponse.data.results || [];
+      allPractitioners.push(...cityResults);
+    } catch (e) { }
+
+    // Try zip code search
+    try {
+      const zipResponse = await axios.get(NPPES_BASE_URL, {
+        params: {
+          postal_code: hospitalZip,
+          pretty: true,
+          version: '2.1',
+          limit: 500
+        }
+      });
+      const zipResults = zipResponse.data.results || [];
+      allPractitioners.push(...zipResults);
+    } catch (e) { }
+
+    // Deduplicate by NPI
+    const uniqueMap = new Map();
+    for (const r of allPractitioners) {
+      if (!uniqueMap.has(r.number)) {
+        uniqueMap.set(r.number, r);
+      }
+    }
+
     const hospitalNpiNum = parseInt(validatedNpi);
 
-    return allResults
+    return Array.from(uniqueMap.values())
       .filter(r => {
         if (r.enumeration_type === 'NPI-2') return false;
         if (r.parent_organization_legacy_number === hospitalNpiNum) return true;
