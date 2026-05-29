@@ -1,0 +1,25 @@
+{
+  "name": "simhospital-autoconfig",
+  "version": "1.0.0",
+  "description": "Automatically configure Google Simhospital to reflect real-world hospital traits",
+  "main": "src/index.js",
+  "scripts": {
+    "generate": "node src/index.js",
+    "test": "node --test src/**/*.test.js"
+  },
+  "keywords": [
+    "simhospital",
+    "hl7",
+    "healthcare",
+    "npi"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "commander": "^12.0.0",
+    "dotenv": "^16.3.1",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {}
+}
