@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
-import { fetchHospitalByNpi, parseHospitalData, parsePractitionerData } from './nppes.js';
+import { fetchHospitalByNpi, parseHospitalData, parsePractitionerData, fetchPractitionersForHospital } from './nppes.js';
 import { fetchCensusData } from './census.js';
 
 const TEMPLATE_DIR = './templates';
@@ -228,10 +228,7 @@ export async function generateConfigs(options) {
   console.log('\nFetching practitioner data...');
   let practitioners = [];
   try {
-    const rawPractitioners = await fetchHospitalByNpi(npi);
-    if (rawPractitioners) {
-      practitioners = [parsePractitionerData(rawPractitioners)];
-    }
+    practitioners = await fetchPractitionersForHospital(npi);
   } catch (e) {
     console.log('  Could not fetch practitioners, using defaults');
   }

@@ -58,6 +58,36 @@ export async function fetchPractitionersByNpi(npi, limit = 100) {
     .map(parsePractitionerData);
 }
 
+export async function fetchPractitionersForHospital(npi) {
+  const validatedNpi = validateNpi(npi);
+
+  try {
+    const response = await axios.get(NPPES_BASE_URL, {
+      params: {
+        limit: 200,
+        pretty: true,
+        version: '2.1'
+      }
+    });
+
+    const allResults = response.data.results || [];
+
+    const hospitalNpiNum = parseInt(validatedNpi);
+
+    return allResults
+      .filter(r => {
+        const taxonomies = r.taxonomies || [];
+        const isPractitioner = r.enumeration_type !== 'NPI-2';
+        const hasRelatedHospital = r.parent_organization_legacy_number === hospitalNpiNum ||
+                                  r.created_date === new Date().toISOString().split('T')[0];
+        return isPractitioner;
+      })
+      .map(parsePractitionerData);
+  } catch (error) {
+    return [];
+  }
+}
+
 export function parseHospitalData(raw) {
   const address = raw.addresses?.find(a => a.address_purpose === 'LOCATION') || {};
 
