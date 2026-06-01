@@ -108,7 +108,7 @@ patient_name:
   male_prefixes:
     - "Mr"
   # In 1911 only 37% babies were given middle name, these days - 80%:
-  # http://www.dailymail.co.uk/news/article-2515376/Middle-names-booming-80-children-given-parents-chosen-honour-lost-relatives.html
+  # https://www.dailymail.co.uk/news/article-2515376/Middle-names-booming-80-children-given-parents-chosen-honour-lost-relatives.html
   # Assume an average of 55%.
   middlename_percentage: 55
 
