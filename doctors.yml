@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Specialties come from
-# http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0069
+# https://hl7-definition.caristix.com/v2/2.5.1/Tables/0069
 - id: "C001"
   surname: "Forster"
   firstname: "Richard"
