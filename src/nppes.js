@@ -197,13 +197,15 @@ export function parsePractitionerData(raw) {
 
   const firstName = basic.first_name || '';
   const lastName = basic.last_name || '';
+  const credential = basic.credential || '';
 
   return {
     npi: String(raw.number || ''),
     name: `${firstName} ${lastName}`.trim() || 'Unknown',
     firstName,
     lastName,
-    prefix: basic.credential || 'Dr',
+    prefix: 'Dr',
+    credential,
     specialty: taxonomy.code?.substring(0, 3) || 'MED',
     specialtyDescription: taxonomy.desc || '',
     address: {
