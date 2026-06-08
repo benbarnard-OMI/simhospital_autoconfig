@@ -20,6 +20,7 @@ allergy:
   # https://hl7-definition.caristix.com/v2/HL7v2.3.1/Tables/0127
   types:
     - "DA"
+    - "EA"
     - "FA"
     - "MA"
     - "MC"
