@@ -15,7 +15,6 @@
 ED:
   poc: ED
   facility: "${ORGANIZATION_NAME}"
-  building:
   floor: 1
   room: ED
   type: ED

@@ -54,19 +54,19 @@ document:
   # Reference:
   # https://hl7-definition.caristix.com/v2/HL7v2.3.1/Tables/0270
   types:
-  - "AR"
-  - "CD"
-  - "CN"
-  - "DI"
-  - "DS"
-  - "ED"
-  - "HP"
-  - "OP"
-  - "PC"
-  - "PH"
-  - "PN"
-  - "SP"
-  - "TS"
+    - "AR"
+    - "CD"
+    - "CN"
+    - "DI"
+    - "DS"
+    - "ED"
+    - "HP"
+    - "OP"
+    - "PC"
+    - "PH"
+    - "PN"
+    - "SP"
+    - "TS"
 
 #
 # Procedures.
