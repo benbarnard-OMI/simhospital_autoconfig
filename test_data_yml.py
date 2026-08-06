@@ -14,7 +14,7 @@ def test_data_yml_is_valid_yaml():
         data = yaml.safe_load(f)
     assert data is not None
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def data_yml():
     with open(DATA_YML_PATH, 'r') as f:
         return yaml.safe_load(f)
