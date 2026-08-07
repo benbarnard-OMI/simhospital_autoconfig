@@ -4,6 +4,15 @@ import pytest
 
 DATA_YML_PATH = os.path.join(os.path.dirname(__file__), 'data.yml')
 
+def assert_non_empty_list(parent_dict, key):
+    assert key in parent_dict
+    assert isinstance(parent_dict[key], list)
+    assert len(parent_dict[key]) > 0
+
+def assert_has_type(parent_dict, key, expected_type):
+    assert key in parent_dict
+    assert isinstance(parent_dict[key], expected_type)
+
 def test_data_yml_exists():
     """Verify that data.yml exists."""
     assert os.path.exists(DATA_YML_PATH)
@@ -24,62 +33,29 @@ def test_allergy_section(data_yml):
     assert 'allergy' in data_yml
     allergy = data_yml['allergy']
 
-    assert 'reactions' in allergy
-    assert isinstance(allergy['reactions'], list)
-    assert len(allergy['reactions']) > 0
-
-    assert 'percentage' in allergy
-    assert isinstance(allergy['percentage'], int)
-
-    assert 'maximum_allergies' in allergy
-    assert isinstance(allergy['maximum_allergies'], int)
+    assert_non_empty_list(allergy, 'reactions')
+    assert_has_type(allergy, 'percentage', int)
+    assert_has_type(allergy, 'maximum_allergies', int)
 
 def test_patient_name_section(data_yml):
     """Verify the patient_name section in data.yml."""
     assert 'patient_name' in data_yml
     patient_name = data_yml['patient_name']
 
-    assert 'degrees' in patient_name
-    assert isinstance(patient_name['degrees'], list)
-    assert len(patient_name['degrees']) > 0
-
-    assert 'degree_percentage' in patient_name
-    assert isinstance(patient_name['degree_percentage'], int)
-
-    assert 'suffixes' in patient_name
-    assert isinstance(patient_name['suffixes'], list)
-    assert len(patient_name['suffixes']) > 0
-
-    assert 'suffix_percentage' in patient_name
-    assert isinstance(patient_name['suffix_percentage'], int)
-
-    assert 'female_prefixes' in patient_name
-    assert isinstance(patient_name['female_prefixes'], list)
-    assert len(patient_name['female_prefixes']) > 0
-
-    assert 'male_prefixes' in patient_name
-    assert isinstance(patient_name['male_prefixes'], list)
-    assert len(patient_name['male_prefixes']) > 0
-
-    assert 'middlename_percentage' in patient_name
-    assert isinstance(patient_name['middlename_percentage'], int)
+    assert_non_empty_list(patient_name, 'degrees')
+    assert_has_type(patient_name, 'degree_percentage', int)
+    assert_non_empty_list(patient_name, 'suffixes')
+    assert_has_type(patient_name, 'suffix_percentage', int)
+    assert_non_empty_list(patient_name, 'female_prefixes')
+    assert_non_empty_list(patient_name, 'male_prefixes')
+    assert_has_type(patient_name, 'middlename_percentage', int)
 
 def test_address_section(data_yml):
     """Verify the address section in data.yml."""
     assert 'address' in data_yml
     address = data_yml['address']
 
-    assert 'cities' in address
-    assert isinstance(address['cities'], list)
-    assert len(address['cities']) > 0
-
-    assert 'streets' in address
-    assert isinstance(address['streets'], list)
-    assert len(address['streets']) > 0
-
-    assert 'country' in address
-    assert isinstance(address['country'], str)
-
-    assert 'types' in address
-    assert isinstance(address['types'], list)
-    assert len(address['types']) > 0
+    assert_non_empty_list(address, 'cities')
+    assert_non_empty_list(address, 'streets')
+    assert_has_type(address, 'country', str)
+    assert_non_empty_list(address, 'types')
