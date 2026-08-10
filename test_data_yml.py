@@ -17,11 +17,9 @@ def test_data_yml_exists():
     """Verify that data.yml exists."""
     assert os.path.exists(DATA_YML_PATH)
 
-def test_data_yml_is_valid_yaml():
+def test_data_yml_is_valid_yaml(data_yml):
     """Verify that data.yml is valid YAML."""
-    with open(DATA_YML_PATH, 'r') as f:
-        data = yaml.safe_load(f)
-    assert data is not None
+    assert data_yml is not None
 
 @pytest.fixture(scope='session')
 def data_yml():
