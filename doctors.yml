@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+#      https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Specialties come from
-# http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&table=0069
+# https://hl7-definition.caristix.com/v2/HL7v2.5.1/Tables/0069
 - id: "C001"
   surname: "Forster"
   firstname: "Richard"
