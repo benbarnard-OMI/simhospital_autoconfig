@@ -2,11 +2,12 @@ import os
 import yaml
 import pytest
 
+REQUIRED_FILES = ['hl7.yml', 'locations.yml', 'doctors.yml', 'data.yml', 'ethnicity.csv']
 YAML_FILES = ['hl7.yml', 'locations.yml', 'doctors.yml']
 
-@pytest.mark.parametrize('filename', YAML_FILES)
+@pytest.mark.parametrize('filename', REQUIRED_FILES)
 def test_yaml_exists(filename):
-    """Verify that the YAML file exists."""
+    """Verify that each required configuration file exists."""
     filepath = os.path.join(os.path.dirname(__file__), filename)
     assert os.path.exists(filepath)
 

@@ -13,9 +13,6 @@ def assert_has_type(parent_dict, key, expected_type):
     assert key in parent_dict
     assert isinstance(parent_dict[key], expected_type)
 
-def test_data_yml_exists():
-    """Verify that data.yml exists."""
-    assert os.path.exists(DATA_YML_PATH)
 
 def test_data_yml_is_valid_yaml(data_yml):
     """Verify that data.yml is valid YAML."""
