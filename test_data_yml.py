@@ -11,13 +11,13 @@ def test_data_yml_exists():
 def test_data_yml_is_valid_yaml():
     """Verify that data.yml is valid YAML."""
     with open(DATA_YML_PATH, 'r') as f:
-        data = yaml.safe_load(f)
+        data = yaml.load(f, Loader=getattr(yaml, 'CSafeLoader', yaml.SafeLoader))
     assert data is not None
 
 @pytest.fixture(scope='session')
 def data_yml():
     with open(DATA_YML_PATH, 'r') as f:
-        return yaml.safe_load(f)
+        return yaml.load(f, Loader=getattr(yaml, 'CSafeLoader', yaml.SafeLoader))
 
 def test_allergy_section(data_yml):
     """Verify the allergy section in data.yml."""
