@@ -4,9 +4,6 @@ import pytest
 
 CSV_PATH = os.path.join(os.path.dirname(__file__), 'ethnicity.csv')
 
-def test_ethnicity_csv_exists():
-    """Verify that ethnicity.csv exists."""
-    assert os.path.exists(CSV_PATH)
 
 def test_ethnicity_csv_valid_data():
     """Verify the data format in ethnicity.csv."""

@@ -3,10 +3,6 @@ import yaml
 
 DOCTORS_YML_PATH = os.path.join(os.path.dirname(__file__), 'doctors.yml')
 
-def test_doctors_yml_exists():
-    """Verify that doctors.yml exists."""
-    assert os.path.exists(DOCTORS_YML_PATH)
-
 def test_doctors_yml_is_valid_yaml():
     """Verify that doctors.yml is valid YAML and parses as a list."""
     with open(DOCTORS_YML_PATH, 'r') as f:
