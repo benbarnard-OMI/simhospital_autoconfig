@@ -17,7 +17,7 @@ def test_doctors_yaml_structure():
 
     for doctor in data:
         # Check required keys
-        missing_keys = required_keys - set(doctor.keys())
+        missing_keys = required_keys - doctor.keys()
         assert not missing_keys, f"Doctor entry missing required keys: {missing_keys}"
 
         # Check all values are strings
