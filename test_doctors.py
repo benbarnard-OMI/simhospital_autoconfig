@@ -1,6 +1,4 @@
 import yaml
-import pytest
-
 import os
 
 def test_doctors_yaml_structure():
