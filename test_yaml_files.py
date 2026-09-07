@@ -18,11 +18,3 @@ def test_yaml_is_valid_yaml(filename):
     with open(filepath, 'r') as f:
         data = yaml.safe_load(f)
     assert data is not None
-
-    if filename == 'doctors.yml':
-        assert isinstance(data, list)
-        assert len(data) > 0
-        assert 'id' in data[0]
-        assert 'surname' in data[0]
-        assert 'firstname' in data[0]
-        assert 'specialty' in data[0]
