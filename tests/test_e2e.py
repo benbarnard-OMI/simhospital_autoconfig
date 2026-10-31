@@ -99,20 +99,22 @@ def test_e2e_generates_all_files(tmp_path, sample_nppes_result):
 
 
 def test_e2e_with_recorded_cassettes(tmp_path, nppes_result):
-    from simhospital_autoconfig.cms import CMSClient
-
-    cms = CMSClient()
-    try:
-        with CASSETTE_VCR.use_cassette(CASSETTE_PATH):
-            hospital_data = cms.get_hospital_by_npi(NPI)
-    except Exception:
-        hospital_data = None
+    # CMS is deliberately not replayed here. The Provider Data Catalog offers no
+    # working server-side filter, so the client downloads a 1.4 MB bulk CSV; putting
+    # that in the cassette would dwarf everything else in it. The catalog contract is
+    # covered against mocks in tests/test_integration_cms.py instead.
+    hospital_data = None
 
     demographics = {
-        "total_population": 50000,
-        "ethnicity": {"H": 15000, "W": 25000, "B": 5000, "A": 3000},
-        "sex_by_age": {"B01001_001E": 50000},
-        "zcta": "60601",
+        "total_population": 34699,
+        "ethnicity": {"2135-2": 5577, "2106-3": 7683, "2054-5": 18753},
+        "ethnicity_labels": {
+            "2135-2": "Hispanic or Latino",
+            "2106-3": "White",
+            "2054-5": "Black or African American",
+        },
+        "zcta": "60612",
+        "acs_year": 2023,
     }
     doctors = [
         {

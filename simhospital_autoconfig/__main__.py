@@ -7,14 +7,16 @@ Usage:
     python -m simhospital_autoconfig generate --zip 60601
 """
 
+from __future__ import annotations
+
 import argparse
 import logging
 import sys
 
 from .census import CensusClient
-from .cms import CMSClient
+from .cms import COL_FACILITY_ID, CMSClient
 from .generators import generate_all_configs
-from .nppes import NPPESClient
+from .nppes import NPPESClient, NPPESResult
 from .specialties import get_specialties_for_hospital
 
 logging.basicConfig(
@@ -22,6 +24,80 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# NPPES publishes "other identifier" type codes as numbers, so matching on the
+# literal string "ccn" never fired. Code 02 is the Medicare OSCAR number, which is
+# the CMS Certification Number; descriptions are matched too as a fallback.
+CCN_IDENTIFIER_CODES = {"02"}
+CCN_IDENTIFIER_DESC_HINTS = ("oscar", "ccn")
+
+
+def _find_ccn(nppes_result: NPPESResult) -> str | None:
+    """Return the CMS Certification Number from NPPES identifiers, if published."""
+    for identifier in nppes_result.identifiers or []:
+        code = (identifier.code or "").strip()
+        desc = (identifier.desc or "").lower()
+        if code in CCN_IDENTIFIER_CODES or any(h in desc for h in CCN_IDENTIFIER_DESC_HINTS):
+            value = (identifier.identifier or "").strip()
+            if value:
+                return value
+    return None
+
+
+def _resolve_cms_hospital(
+    cms_client: CMSClient, nppes_result: NPPESResult
+) -> dict | None:
+    """Resolve this hospital in the CMS catalog, or None if it cannot be matched.
+
+    Returns None rather than a fabricated record when there is no match, so the
+    generators fall back to their own defaults instead of consuming invented CMS
+    facts. The previous fallback asserted ``emergency_services: "Y"`` for every
+    hospital, which presented a guess as a CMS finding.
+
+    The catalog has no NPI column, so the join is CCN first and facility
+    name-plus-state second.
+    """
+    row = None
+    ccn = _find_ccn(nppes_result)
+
+    if ccn:
+        try:
+            row = cms_client.get_hospital_by_ccn(ccn)
+            logger.info("Matched CMS hospital by CCN %s", ccn)
+        except ValueError:
+            logger.info("No CMS facility with CCN %s; trying name and state", ccn)
+
+    if row is None:
+        address = nppes_result.address
+        state = address.state if address else None
+        name = nppes_result.organization_name
+        if name and state:
+            hits = cms_client.search_hospitals(name=name, state=state)
+            if len(hits) == 1:
+                row = hits[0]
+                logger.info(
+                    "Matched CMS hospital by name and state: %s", row.get(COL_FACILITY_ID)
+                )
+            elif len(hits) > 1:
+                logger.warning(
+                    "CMS returned %d facilities matching %r in %s (%s); refusing to "
+                    "guess. locations.yml will use built-in defaults.",
+                    len(hits),
+                    name,
+                    state,
+                    ", ".join(h.get(COL_FACILITY_ID, "?") for h in hits),
+                )
+                return None
+
+    if row is None:
+        logger.warning(
+            "No CMS match for %r; hospital type and ED status are unknown and "
+            "locations.yml will use built-in defaults.",
+            nppes_result.organization_name,
+        )
+        return None
+
+    return cms_client.map_to_simhospital_config(row)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -99,26 +175,14 @@ def run_generate(args: argparse.Namespace) -> int:
     if nppes_result:
         logger.info("Fetching CMS data")
         try:
-            # Try to find CCN from NPPES identifiers
-            ccn = None
-            if nppes_result.identifiers:
-                for identifier in nppes_result.identifiers:
-                    if identifier.code.lower() == "ccn":
-                        ccn = identifier.identifier
-                        break
-            if ccn:
-                hospital_data = cms_client.get_hospital_by_ccn(ccn)
-            else:
-                hospital_data = cms_client.map_to_simhospital_config({
-                    "hospital_name": nppes_result.organization_name,
-                    "hospital_type": "",
-                    "emergency_services": "Y",
-                    "city": nppes_result.address.city if nppes_result.address else "",
-                    "state": nppes_result.address.state if nppes_result.address else "",
-                    "zip_code": nppes_result.address.postal_code if nppes_result.address else "",
-                })
+            hospital_data = _resolve_cms_hospital(cms_client, nppes_result)
         except Exception as exc:  # pylint: disable=broad-except
-            logger.warning("CMS fetch failed, continuing with defaults: %s", exc)
+            logger.warning(
+                "CMS lookup failed for %s (%s). locations.yml will use built-in "
+                "defaults instead of this hospital's real type and ED status.",
+                nppes_result.organization_name,
+                exc,
+            )
 
         logger.info("Fetching Census demographics")
         try:
