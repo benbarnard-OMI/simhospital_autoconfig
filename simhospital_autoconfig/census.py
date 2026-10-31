@@ -3,11 +3,12 @@ Census ACS fetcher for US demographics data.
 
 API Documentation: https://www.census.gov/data/developers/guidance/api-user-guide.html
 """
+from __future__ import annotations
 
 import logging
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 import requests
 
@@ -85,15 +86,15 @@ SEX_AGE_VARIABLES = [
 class CensusClient:
     """Client for interacting with the US Census Bureau ACS API."""
 
-    def __init__(self, api_key: Optional[str] = None, timeout: int = 30):
+    def __init__(self, api_key: str | None = None, timeout: int = 30):
         self.api_key = api_key or os.environ.get("CENSUS_API_KEY")
         self.timeout = timeout
 
-    def _request(self, url: str, params: Dict[str, str]) -> Dict[str, Any]:
+    def _request(self, url: str, params: dict[str, str]) -> dict[str, Any]:
         """Make an API request with retry logic."""
         max_attempts = 3
         base_delay = 1.0
-        last_exception: Optional[Exception] = None
+        last_exception: Exception | None = None
         for attempt in range(1, max_attempts + 1):
             try:
                 response = requests.get(url, params=params, timeout=self.timeout)
@@ -115,7 +116,7 @@ class CensusClient:
     def _build_acs_url(self, year: int = 2021) -> str:
         return f"{CENSUS_API_BASE}/{year}/acs/acs5"
 
-    def get_demographics(self, zcta: str) -> Dict[str, Any]:
+    def get_demographics(self, zcta: str) -> dict[str, Any]:
         """
         Fetch demographics for a ZIP Code Tabulation Area.
 
@@ -146,11 +147,11 @@ class CensusClient:
         values = data[1]
         row = dict(zip(headers, values))
 
-        ethnicity: Dict[str, int] = {}
+        ethnicity: dict[str, int] = {}
         for var, code in RACE_ETHNICITY_MAP.items():
             ethnicity[code] = int(row.get(var, 0))
 
-        sex_by_age: Dict[str, int] = {}
+        sex_by_age: dict[str, int] = {}
         for var in SEX_AGE_VARIABLES:
             sex_by_age[var] = int(row.get(var, 0))
 

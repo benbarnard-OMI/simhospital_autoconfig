@@ -3,12 +3,13 @@ Generators for Simhospital configuration files.
 
 These functions take hospital data and generate the appropriate config files.
 """
+from __future__ import annotations
 
 import csv
 import io
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -429,7 +430,7 @@ def generate_hl7_yml(
     organization_name: str,
     organization_id: str,
     hospital_service: str = "MED",
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
 ) -> str:
     """
     Generate hl7.yml configuration file with hospital-specific values.
@@ -460,8 +461,8 @@ def generate_hl7_yml(
 def generate_locations_yml(
     organization_name: str,
     organization_id: str,
-    hospital_data: Optional[Dict[str, Any]] = None,
-    output_path: Optional[str] = None,
+    hospital_data: dict[str, Any] | None = None,
+    output_path: str | None = None,
 ) -> str:
     """
     Generate locations.yml configuration file with hospital-specific values.
@@ -498,9 +499,9 @@ def generate_locations_yml(
 def generate_data_yml(
     organization_name: str,
     organization_id: str,
-    address: Optional[NPPESAddress] = None,
-    demographics: Optional[Dict[str, Any]] = None,
-    output_path: Optional[str] = None,
+    address: NPPESAddress | None = None,
+    demographics: dict[str, Any] | None = None,
+    output_path: str | None = None,
 ) -> str:
     """
     Generate data.yml configuration file with hospital-specific values.
@@ -546,8 +547,8 @@ def generate_data_yml(
 def generate_ethnicity_csv(
     organization_name: str,
     organization_id: str,
-    demographics: Optional[Dict[str, Any]] = None,
-    output_path: Optional[str] = None,
+    demographics: dict[str, Any] | None = None,
+    output_path: str | None = None,
 ) -> str:
     """
     Generate ethnicity.csv configuration file.
@@ -605,8 +606,8 @@ def generate_ethnicity_csv(
 
 
 def generate_doctors_yml(
-    doctors: List[Dict[str, Any]],
-    output_path: Optional[str] = None,
+    doctors: list[dict[str, Any]],
+    output_path: str | None = None,
 ) -> str:
     """
     Generate doctors.yml configuration file from a list of doctors.
@@ -652,10 +653,10 @@ def generate_doctors_yml(
 def generate_all_configs(
     nppes_result: NPPESResult,
     output_dir: str = ".",
-    demographics: Optional[Dict[str, Any]] = None,
-    hospital_data: Optional[Dict[str, Any]] = None,
-    doctors: Optional[List[Dict[str, Any]]] = None,
-) -> Dict[str, str]:
+    demographics: dict[str, Any] | None = None,
+    hospital_data: dict[str, Any] | None = None,
+    doctors: list[dict[str, Any]] | None = None,
+) -> dict[str, str]:
     """
     Generate all Simhospital configuration files from NPPES data.
 
@@ -676,7 +677,7 @@ def generate_all_configs(
         primary = next((t for t in nppes_result.taxonomies if t.primary), nppes_result.taxonomies[0])
         hospital_service = primary.code or hospital_service
 
-    results: Dict[str, str] = {}
+    results: dict[str, str] = {}
 
     results["hl7.yml"] = generate_hl7_yml(
         org_name,

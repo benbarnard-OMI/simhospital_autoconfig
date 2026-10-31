@@ -3,12 +3,13 @@ NPPES API client for fetching hospital/organization and practitioner data.
 
 API Documentation: https://npiregistry.cms.hhs.gov/api-page
 """
+from __future__ import annotations
 
+import logging
 import re
 import time
-import logging
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 import requests
 
@@ -19,14 +20,14 @@ logger = logging.getLogger(__name__)
 @dataclass
 class NPPESAddress:
     """Represents an address from NPPES."""
-    address_1: Optional[str] = None
-    address_2: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    postal_code: Optional[str] = None
-    country_code: Optional[str] = None
-    address_purpose: Optional[str] = None
-    address_type: Optional[str] = None
+    address_1: str | None = None
+    address_2: str | None = None
+    city: str | None = None
+    state: str | None = None
+    postal_code: str | None = None
+    country_code: str | None = None
+    address_purpose: str | None = None
+    address_type: str | None = None
 
 
 @dataclass
@@ -35,8 +36,8 @@ class NPPESTaxonomy:
     code: str
     desc: str
     primary: bool
-    state: Optional[str] = None
-    license: Optional[str] = None
+    state: str | None = None
+    license: str | None = None
 
 
 @dataclass
@@ -45,8 +46,8 @@ class NPPESIdentifier:
     code: str
     desc: str
     identifier: str
-    state: Optional[str] = None
-    issuer: Optional[str] = None
+    state: str | None = None
+    issuer: str | None = None
 
 
 @dataclass
@@ -54,12 +55,12 @@ class NPPESResult:
     """Represents a parsed NPPES API result for an organization."""
     npi: str
     enumeration_type: str
-    organization_name: Optional[str] = None
-    other_names: Optional[List[Dict[str, str]]] = None
-    address: Optional[NPPESAddress] = None
-    taxonomies: Optional[List[NPPESTaxonomy]] = None
-    identifiers: Optional[List[NPPESIdentifier]] = None
-    raw_response: Optional[Dict[str, Any]] = None
+    organization_name: str | None = None
+    other_names: list[dict[str, str]] | None = None
+    address: NPPESAddress | None = None
+    taxonomies: list[NPPESTaxonomy] | None = None
+    identifiers: list[NPPESIdentifier] | None = None
+    raw_response: dict[str, Any] | None = None
 
 
 class NPPESClient:
@@ -74,18 +75,16 @@ class NPPESClient:
         if not re.fullmatch(r"\d{10}", npi):
             raise ValueError(f"Invalid NPI format: {npi}. Expected 10 digits.")
 
-    def _request_with_backoff(self, params: Dict[str, str]) -> Dict[str, Any]:
+    def _request_with_backoff(self, params: dict[str, str]) -> dict[str, Any]:
         """Make an API request with exponential backoff on rate limits."""
         max_attempts = 5
         base_delay = 1.0
-        last_response = None
         for attempt in range(1, max_attempts + 1):
             response = requests.get(
                 NPPES_API_BASE,
                 params=params,
                 timeout=self.timeout,
             )
-            last_response = response
             if response.status_code != 429:
                 response.raise_for_status()
                 return response.json()
@@ -152,7 +151,7 @@ class NPPESClient:
         )
         return nppes_result
 
-    def _parse_address(self, address_data: Dict[str, Any]) -> Optional[NPPESAddress]:
+    def _parse_address(self, address_data: dict[str, Any]) -> NPPESAddress | None:
         """Parse address from NPPES response."""
         if not address_data:
             return None
@@ -167,7 +166,7 @@ class NPPESClient:
             address_type=address_data.get("address_type"),
         )
 
-    def _parse_taxonomies(self, taxonomy_data: List[Dict[str, Any]]) -> List[NPPESTaxonomy]:
+    def _parse_taxonomies(self, taxonomy_data: list[dict[str, Any]]) -> list[NPPESTaxonomy]:
         """Parse taxonomies from NPPES response."""
         taxonomies = []
         for t in taxonomy_data:
@@ -182,7 +181,7 @@ class NPPESClient:
             )
         return taxonomies
 
-    def _parse_identifiers(self, identifier_data: List[Dict[str, Any]]) -> List[NPPESIdentifier]:
+    def _parse_identifiers(self, identifier_data: list[dict[str, Any]]) -> list[NPPESIdentifier]:
         """Parse identifiers from NPPES response."""
         identifiers = []
         for i in identifier_data:
@@ -200,9 +199,9 @@ class NPPESClient:
     def fetch_doctors_by_location(
         self,
         zip_code: str,
-        specialties: List[str],
+        specialties: list[str],
         limit_per_specialty: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Query NPPES for practitioners by ZIP prefix and taxonomy description.
 
@@ -214,7 +213,7 @@ class NPPESClient:
         Returns:
             Structured list of doctor records
         """
-        doctors: List[Dict[str, Any]] = []
+        doctors: list[dict[str, Any]] = []
         seen = set()
         for specialty in specialties:
             params = {

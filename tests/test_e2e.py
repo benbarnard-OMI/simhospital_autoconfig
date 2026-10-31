@@ -7,16 +7,23 @@ import vcr
 import yaml
 
 from simhospital_autoconfig.generators import generate_all_configs
-from simhospital_autoconfig.nppes import NPPESResult, NPPESAddress, NPPESTaxonomy
-
+from simhospital_autoconfig.nppes import NPPESAddress, NPPESResult, NPPESTaxonomy
 
 NPI = "1730209545"
 CASSETTE_PATH = f"test_simulator_validation[{NPI}]"
 
+# record_mode="none" keeps the suite offline: a request missing from the cassette
+# raises instead of silently hitting the network.
+CASSETTE_VCR = vcr.VCR(
+    cassette_library_dir="tests/cassettes",
+    record_mode="none",
+    path_transformer=vcr.VCR.ensure_suffix(".yaml"),
+)
+
 
 @pytest.fixture
 def nppes_result():
-    with vcr.VCR(cassette_library_dir="tests/cassettes", record_mode="none", path_transformer=vcr.VCR.ensure_suffix(".yaml")).use_cassette(CASSETTE_PATH):
+    with CASSETTE_VCR.use_cassette(CASSETTE_PATH):
         from simhospital_autoconfig.nppes import NPPESClient
         return NPPESClient().get_organization_by_npi(NPI)
 
@@ -96,7 +103,7 @@ def test_e2e_with_recorded_cassettes(tmp_path, nppes_result):
 
     cms = CMSClient()
     try:
-        with vcr.VCR(cassette_library_dir="tests/cassettes", record_mode="none", path_transformer=vcr.VCR.ensure_suffix(".yaml")).use_cassette(CASSETTE_PATH):
+        with CASSETTE_VCR.use_cassette(CASSETTE_PATH):
             hospital_data = cms.get_hospital_by_npi(NPI)
     except Exception:
         hospital_data = None

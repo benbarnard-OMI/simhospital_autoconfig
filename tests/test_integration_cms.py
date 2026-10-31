@@ -1,10 +1,8 @@
 """Integration tests for CMSClient."""
 
-import pytest
 import requests_mock
 
 from simhospital_autoconfig.cms import CMSClient
-
 
 CMS_RESPONSE = [
     {

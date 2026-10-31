@@ -12,8 +12,7 @@ import pytest
 import yaml
 
 from simhospital_autoconfig.generators import generate_all_configs
-from simhospital_autoconfig.nppes import NPPESResult, NPPESAddress, NPPESTaxonomy
-
+from simhospital_autoconfig.nppes import NPPESAddress, NPPESResult, NPPESTaxonomy
 
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures", "1730209545")
 ALLOWED_SPECIALTIES = {
@@ -43,7 +42,7 @@ def sample_nppes_result():
 
 def _load_yaml(filename):
     path = os.path.join(FIXTURE_DIR, filename)
-    with open(path, "r") as f:
+    with open(path) as f:
         return yaml.safe_load(f)
 
 
@@ -70,7 +69,7 @@ def test_data_yml_country_is_usa_for_us_hospital():
 def test_ethnicity_csv_has_exactly_one_nil_sentinel():
     csv_path = os.path.join(FIXTURE_DIR, "ethnicity.csv")
     rows = []
-    with open(csv_path, "r", newline="") as f:
+    with open(csv_path, newline="") as f:
         reader = csv.reader(f)
         for row in reader:
             if not row or row[0].startswith("#"):
@@ -96,7 +95,7 @@ def test_doctors_yml_specialties_in_allowed_set():
     yml_path = os.path.join(FIXTURE_DIR, "doctors.yml")
     if not os.path.exists(yml_path):
         pytest.skip("doctors.yml not generated for this fixture")
-    with open(yml_path, "r") as f:
+    with open(yml_path) as f:
         doctors = yaml.safe_load(f)
     assert isinstance(doctors, list)
     for doc in doctors:

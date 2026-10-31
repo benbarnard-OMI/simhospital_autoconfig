@@ -6,14 +6,17 @@ Follows the Jev Evaluation SOP:
 - Ask narrow, typed questions with clear success criteria.
 """
 
-import os
 import json
+import os
 from pathlib import Path
 
 import pytest
 import yaml
 
-from simhospital_autoconfig.deterministic_checks import run_deterministic_checks, get_deterministic_confidence
+from simhospital_autoconfig.deterministic_checks import (
+    get_deterministic_confidence,
+    run_deterministic_checks,
+)
 
 
 def _load_dotenv() -> None:
@@ -58,12 +61,12 @@ def _get_client():
 
 
 def _load_yaml(filename):
-    with open(FIXTURE_DIR / filename, "r") as f:
+    with open(FIXTURE_DIR / filename) as f:
         return yaml.safe_load(f)
 
 
 def _load_csv(filename):
-    with open(FIXTURE_DIR / filename, "r", newline="") as f:
+    with open(FIXTURE_DIR / filename, newline="") as f:
         return f.read()
 
 

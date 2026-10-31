@@ -4,10 +4,10 @@ CMS Hospital Data Fetcher for hospital type, departments, and location data.
 API Documentation: https://data.cms.gov/
 Dataset: Hospital General Information (xubh-q36u)
 """
+from __future__ import annotations
 
 import logging
-import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 
@@ -21,7 +21,7 @@ class CMSClient:
     def __init__(self, timeout: int = 30):
         self.timeout = timeout
 
-    def get_hospital_by_ccn(self, ccn: str) -> Dict[str, Any]:
+    def get_hospital_by_ccn(self, ccn: str) -> dict[str, Any]:
         """
         Fetch hospital data from CMS Hospital General Information by CCN.
 
@@ -46,7 +46,7 @@ class CMSClient:
             raise ValueError(f"No CMS hospital found for CCN: {ccn}")
         return results[0]
 
-    def get_hospital_by_npi(self, npi: str) -> Optional[Dict[str, Any]]:
+    def get_hospital_by_npi(self, npi: str) -> dict[str, Any] | None:
         """
         Search Hospital General Info by NPI/provider_id.
 
@@ -72,7 +72,7 @@ class CMSClient:
         results = response.json()
         return results[0] if results else None
 
-    def get_hospital_services(self, zcta: str) -> List[str]:
+    def get_hospital_services(self, zcta: str) -> list[str]:
         """
         Query for department presence in a ZCTA (optional).
 
@@ -92,7 +92,7 @@ class CMSClient:
         response.raise_for_status()
         return [row.get("service_code") for row in response.json() if row.get("service_code")]
 
-    def map_to_simhospital_config(self, hospital: Dict[str, Any]) -> Dict[str, Any]:
+    def map_to_simhospital_config(self, hospital: dict[str, Any]) -> dict[str, Any]:
         """
         Map CMS fields to Simhospital configuration.
 

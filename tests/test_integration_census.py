@@ -1,12 +1,10 @@
 """Integration tests for CensusClient."""
 
-import os
 
 import pytest
 import requests_mock
 
 from simhospital_autoconfig.census import CensusClient
-
 
 CENSUS_RESPONSE = [
     [

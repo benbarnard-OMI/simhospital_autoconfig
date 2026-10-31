@@ -81,7 +81,7 @@ class TestEdgeCases:
 
     def test_special_characters_in_hospital_name(self, minimal_nppes_result, tmp_path):
         minimal_nppes_result.organization_name = 'O"Brien & Associates <Test>'
-        results = generate_all_configs(
+        generate_all_configs(
             minimal_nppes_result,
             output_dir=str(tmp_path),
         )
@@ -91,7 +91,7 @@ class TestEdgeCases:
 
     def test_unicode_hospital_name(self, minimal_nppes_result, tmp_path):
         minimal_nppes_result.organization_name = "München Klinik"
-        results = generate_all_configs(
+        generate_all_configs(
             minimal_nppes_result,
             output_dir=str(tmp_path),
         )
@@ -101,7 +101,7 @@ class TestEdgeCases:
 
     def test_very_long_hospital_name(self, minimal_nppes_result, tmp_path):
         minimal_nppes_result.organization_name = "A" * 500
-        results = generate_all_configs(
+        generate_all_configs(
             minimal_nppes_result,
             output_dir=str(tmp_path),
         )
@@ -118,7 +118,7 @@ class TestEdgeCases:
             taxonomies=[],
             identifiers=[],
         )
-        results = generate_all_configs(
+        generate_all_configs(
             nppes_result,
             output_dir=str(tmp_path),
         )
@@ -137,9 +137,9 @@ class TestEdgeCases:
             output_path=str(tmp_path / "ethnicity.csv"),
         )
         lines = content.strip().split("\n")
-        comment_lines = [l for l in lines if l.startswith("#")]
+        comment_lines = [line for line in lines if line.startswith("#")]
         assert len(comment_lines) >= 4
-        data_lines = [l for l in lines if not l.startswith("#") and l.strip()]
+        data_lines = [line for line in lines if not line.startswith("#") and line.strip()]
         assert len(data_lines) == 20
 
     def test_doctors_yml_sorted_by_specialty(self):
@@ -291,7 +291,7 @@ class TestEdgeCases:
             ],
             identifiers=[],
         )
-        results = generate_all_configs(
+        generate_all_configs(
             nppes_result,
             output_dir=str(tmp_path),
         )
@@ -324,7 +324,7 @@ class TestEdgeCases:
 
     def test_generate_locations_yml_with_empty_postalcodes(self, tmp_path):
         from simhospital_autoconfig.generators import generate_locations_yml
-        content = generate_locations_yml(
+        generate_locations_yml(
             "Test Hospital",
             "1730209545",
             hospital_data={"postalcodes": []},

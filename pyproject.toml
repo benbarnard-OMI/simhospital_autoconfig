@@ -23,6 +23,9 @@ dev = [
     "requests-mock>=1.10,<2.0",
     # vcrpy <6 is incompatible with urllib3 2.x (VCRHTTPResponse lacks version_string).
     "vcrpy>=6.0",
+    # Pinned: ruff's default rule set has changed between releases, and an unpinned
+    # linter makes CI results drift (ruff 0.17 defaults surfaced 201 findings here).
+    "ruff==0.17.3",
 ]
 typesafe = [
     "typesafe-sdk",
@@ -47,3 +50,31 @@ norecursedirs = [
     "*.egg-info",
     "__pycache__",
 ]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+extend-exclude = ["simhospital"]
+
+[tool.ruff.lint]
+# Declared explicitly rather than relying on ruff's defaults, which have changed
+# across releases and are not stable for an unpinned linter in CI.
+select = ["E", "F", "I", "UP", "FA", "B", "BLE"]
+
+[tool.ruff.lint.per-file-ignores]
+# BLE001 (blind `except Exception`) is intentional in these two modules:
+#   __main__.py             each data source is fetched independently and a failure
+#                           degrades to defaults rather than aborting generation
+#                           (documented under README "Limitations").
+#   deterministic_checks.py every check is wrapped so a raised error is reported as a
+#                           failed check (False, reason) instead of propagating.
+# NOTE: this broad degradation is exactly what let the dead CMS endpoint and the
+# missing Census key pass unnoticed. Making it loud is tracked as defects D3/D8 in
+# docs/PROGRESS.md; revisit these ignores when that lands.
+"simhospital_autoconfig/__main__.py" = ["BLE001"]
+"simhospital_autoconfig/deterministic_checks.py" = ["BLE001"]
+# Tests exercise failure paths and assert on raised exceptions.
+"tests/*" = ["BLE001"]
+# The Jev `instructions=` values are natural-language prompts; wrapping them
+# mid-sentence costs more readability than the over-length line does.
+"tests/test_typesafe_validation.py" = ["BLE001", "E501"]

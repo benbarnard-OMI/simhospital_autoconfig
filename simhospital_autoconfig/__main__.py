@@ -10,12 +10,11 @@ Usage:
 import argparse
 import logging
 import sys
-from typing import List, Optional
 
 from .census import CensusClient
 from .cms import CMSClient
 from .generators import generate_all_configs
-from .nppes import NPPESClient, get_hospital_data
+from .nppes import NPPESClient
 from .specialties import get_specialties_for_hospital
 
 logging.basicConfig(
@@ -73,7 +72,7 @@ def run_generate(args: argparse.Namespace) -> int:
     nppes_result = None
     hospital_data = None
     demographics = None
-    doctors: List[dict] = []
+    doctors: list[dict] = []
 
     if args.npi:
         logger.info("Fetching hospital by NPI: %s", args.npi)
