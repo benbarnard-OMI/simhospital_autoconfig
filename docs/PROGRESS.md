@@ -19,7 +19,8 @@ Baseline      141 passed, 7 skipped (offline)  ·  148 passed (with API keys)  �
 Deterministic 17/17 checks pass on freshly generated output
 Simulator     make validate-simulator exits 0 in ~48s — local only, see the Docker note
 CLI           all three input paths work: --npi, --zip [--name], --name --state
-Branch        chore/stabilize @ fe79dfb5 — PUSHED to origin, 18 commits ahead of main
+Branch        chore/stabilize @ 1e1609c — PUSHED to origin, ahead of main by all of session 2
+              (exact count: `git rev-list --count origin/main..HEAD`)
 PR            none opened. GitHub's create-PR link is in the push output.
 CI            has NOT run. Both jobs are gated on push-to-main / PR-to-main only.
 ```
@@ -45,7 +46,8 @@ environment.
 2. **D13 is the only open functional gap.** The CMS↔NPPES join cannot be made for the canonical
    hospital (details in Remaining work). Everything else found in session 2 is fixed.
 3. **Rotate the two API keys** in `.env` when convenient. Neither is in git history — verified by
-   scanning all 18 commit trees — but the TypeSafe key was pasted into a chat transcript.
+   scanning every commit tree in `origin/main..HEAD` — but the TypeSafe key was pasted into a chat
+   transcript.
 4. **Housekeeping**, all optional: prune the stale `roan-stranger` branch and
    `.kilo/worktrees/roan-stranger`; delete the stale 0.1.0 artifacts in `dist/`; add `scripts/` to
    the ruff target (~19 findings) or leave it out deliberately.
