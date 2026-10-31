@@ -1,6 +1,6 @@
 # Project Progress — simhospital_autoconfig
 
-_Last updated: 2026-10-31, end of session 2._
+_Last updated: 2026-10-31, end of session 2. Branch pushed to origin; nothing merged._
 
 ## TL;DR
 
@@ -17,10 +17,42 @@ All of that is now fixed and verified against the live APIs and the real simulat
 ```
 Baseline      141 passed, 7 skipped (offline)  ·  148 passed (with API keys)  ·  ruff clean
 Deterministic 17/17 checks pass on freshly generated output
-Simulator     make validate-simulator exits 0 in ~48s against real generated configs
+Simulator     make validate-simulator exits 0 in ~48s — local only, see the Docker note
 CLI           all three input paths work: --npi, --zip [--name], --name --state
-Branch        chore/stabilize, ahead of main, NOT pushed, no PR
+Branch        chore/stabilize @ fe79dfb5 — PUSHED to origin, 18 commits ahead of main
+PR            none opened. GitHub's create-PR link is in the push output.
+CI            has NOT run. Both jobs are gated on push-to-main / PR-to-main only.
 ```
+
+### Read this before the next session
+
+**A CI result of 141 passed / 7 skipped is expected, not a regression.** Locally the count is 148
+because `typesafe_sdk` is still present in `.venv` from the broken 3.12 environment. It lives in
+the `typesafe` extra, which CI does not install, so those 7 live-API tests skip there.
+
+**CI has never executed this workflow.** The session-2 CI fixes were verified locally against the
+same commands and the same Python version (3.12), but not by an actual Actions run. Opening a PR
+is the first real execution, and the first time `pip install -e ".[dev]"` runs against a clean
+environment.
+
+**Nothing is merged.** `main` is still at `8a82936`, unchanged.
+
+### Start here next session
+
+1. **Decide on the PR.** Opening one is the only way to get a real CI signal. Expect the
+   `simulator-validation` job to pass with a "Simulator validation skipped" warning annotation —
+   that is the designed behaviour now, not a failure.
+2. **D13 is the only open functional gap.** The CMS↔NPPES join cannot be made for the canonical
+   hospital (details in Remaining work). Everything else found in session 2 is fixed.
+3. **Rotate the two API keys** in `.env` when convenient. Neither is in git history — verified by
+   scanning all 18 commit trees — but the TypeSafe key was pasted into a chat transcript.
+4. **Housekeeping**, all optional: prune the stale `roan-stranger` branch and
+   `.kilo/worktrees/roan-stranger`; delete the stale 0.1.0 artifacts in `dist/`; add `scripts/` to
+   the ruff target (~19 findings) or leave it out deliberately.
+
+Environment note: `.venv` is Python 3.12.12 via `uv`, and `.env` holds `CENSUS_API_KEY` and
+`TYPESAFE_API_KEY`. Load them with `set -a; . ./.env; set +a`. Both files are gitignored and will
+not be recreated by a clone — see `.env.example` and CONTRIBUTING.md.
 
 ---
 
