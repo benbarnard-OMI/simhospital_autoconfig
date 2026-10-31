@@ -17,7 +17,6 @@ from .census import CensusClient
 from .cms import COL_FACILITY_ID, CMSClient
 from .generators import generate_all_configs
 from .nppes import NPPESClient, NPPESResult
-from .specialties import get_specialties_for_hospital
 
 logging.basicConfig(
     level=logging.INFO,
@@ -192,19 +191,35 @@ def run_generate(args: argparse.Namespace) -> int:
                 else "00000"
             )
             demographics = census_client.get_demographics(zcta)
+            logger.info(
+                "Census ZCTA %s: population %d, %d ethnicity categories",
+                zcta,
+                demographics["total_population"],
+                len(demographics["ethnicity"]),
+            )
         except Exception as exc:  # pylint: disable=broad-except
-            logger.warning("Census fetch failed, continuing without demographics: %s", exc)
+            logger.warning(
+                "Census fetch failed for %s (%s). ethnicity.csv will fall back to the "
+                "upstream UK distribution, which does not describe this hospital's "
+                "population.",
+                nppes_result.organization_name,
+                exc,
+            )
 
         logger.info("Fetching doctors by location")
         try:
             if nppes_result.address and nppes_result.address.postal_code:
-                taxonomies = [
-                    {"desc": t.desc} for t in (nppes_result.taxonomies or [])
-                ]
-                specialties = get_specialties_for_hospital(taxonomies) or ["MED"]
+                # A hospital's own NPPES taxonomies are organizational -- Stroger's sole
+                # entry is "General Acute Care Hospital" -- which matches almost no
+                # individual practitioners. Search the fixed clinical roster instead;
+                # each practitioner's own taxonomy decides their HL7 code.
                 doctors = nppes_client.fetch_doctors_by_location(
                     nppes_result.address.postal_code[:5],
-                    specialties,
+                )
+                logger.info("Fetched %d practitioners", len(doctors))
+            else:
+                logger.warning(
+                    "No postal code in the NPPES address; doctors.yml will not be generated"
                 )
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("NPPES doctor fetch failed, continuing without doctors: %s", exc)

@@ -701,9 +701,75 @@ NUCC_TO_HL7_MAP = {
 }
 
 
+# The codes Simhospital's own doctors.yml uses, and the only ones the deterministic
+# checks and schema tests accept. NUCC_TO_HL7_MAP is far broader than this -- 688
+# descriptions spanning 584 distinct HL7 Table 0069 codes -- so get_hl7_code coerces
+# anything outside the set back into it rather than emitting a code that generated
+# output would then fail validation on.
+ALLOWED_SPECIALTIES = {
+    "MED", "SUR", "URO", "PUL", "CAR",
+    "ANESTH", "EMER", "FAMP", "INTMED", "OBG", "PEDS", "PSY", "RAD", "TRAUM",
+}
+
+DEFAULT_SPECIALTY = "MED"
+
+# Keyword -> allowed code, applied when the exact mapping lands outside
+# ALLOWED_SPECIALTIES. Ordered most specific first; first match wins.
+_FALLBACK_KEYWORDS = (
+    ("radiolog", "RAD"),
+    ("radiat", "RAD"),
+    ("emergency", "EMER"),
+    ("trauma", "TRAUM"),
+    ("anesthesi", "ANESTH"),
+    ("cardio", "CAR"),
+    ("cardiac", "CAR"),
+    ("pulmon", "PUL"),
+    ("nephrolog", "URO"),
+    ("urolog", "URO"),
+    ("obstetric", "OBG"),
+    ("gynecol", "OBG"),
+    ("neonat", "PEDS"),
+    ("pediatric", "PEDS"),
+    ("psychiatr", "PSY"),
+    ("psycholog", "PSY"),
+    ("surg", "SUR"),
+    ("family", "FAMP"),
+    ("internal medicine", "INTMED"),
+)
+
+# NUCC taxonomy descriptions searched when building a hospital's doctor roster.
+# A hospital's own NPPES taxonomies are organizational -- Stroger's sole entry is
+# "General Acute Care Hospital", which matches essentially no individual
+# practitioners -- so the roster is a fixed set of common clinical specialties and
+# each practitioner's own taxonomy decides their HL7 code.
+CLINICAL_ROSTER = (
+    "Internal Medicine",
+    "Emergency Medicine",
+    "Family Medicine",
+    "General Surgery",
+    "Anesthesiology",
+    "Pediatrics",
+    "Psychiatry",
+    "Radiology",
+)
+
+
 def get_hl7_code(nucc_desc: str) -> str:
-    """Map a NUCC taxonomy description to an HL7 Table 0069 code."""
-    return NUCC_TO_HL7_MAP.get(nucc_desc, "MED")
+    """Map a NUCC taxonomy description to an allowed HL7 Table 0069 code.
+
+    Falls back to a keyword match on the description, then to MED, so the result is
+    always a member of ALLOWED_SPECIALTIES.
+    """
+    code = NUCC_TO_HL7_MAP.get(nucc_desc)
+    if code in ALLOWED_SPECIALTIES:
+        return code
+
+    lowered = (nucc_desc or "").lower()
+    for keyword, allowed in _FALLBACK_KEYWORDS:
+        if keyword in lowered:
+            return allowed
+
+    return DEFAULT_SPECIALTY
 
 
 def get_specialties_for_hospital(taxonomies: list[dict[str, Any]]) -> list[str]:
@@ -714,7 +780,7 @@ def get_specialties_for_hospital(taxonomies: list[dict[str, Any]]) -> list[str]:
         taxonomies: List of taxonomy dicts with at least a 'desc' key
 
     Returns:
-        Deduplicated list of HL7 Table 0069 codes
+        Deduplicated list of HL7 Table 0069 codes, all within ALLOWED_SPECIALTIES
     """
     codes = set()
     for taxonomy in taxonomies:

@@ -8,10 +8,13 @@ from __future__ import annotations
 import logging
 import re
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
 import requests
+
+from .specialties import CLINICAL_ROSTER, get_hl7_code
 
 NPPES_API_BASE = "https://npiregistry.cms.hhs.gov/api/"
 logger = logging.getLogger(__name__)
@@ -199,45 +202,60 @@ class NPPESClient:
     def fetch_doctors_by_location(
         self,
         zip_code: str,
-        specialties: list[str],
+        taxonomy_descriptions: Sequence[str] = CLINICAL_ROSTER,
         limit_per_specialty: int = 20,
     ) -> list[dict[str, Any]]:
         """
-        Query NPPES for practitioners by ZIP prefix and taxonomy description.
+        Query NPPES for individual practitioners near a ZIP code.
 
         Args:
-            zip_code: Postal code prefix (e.g., "12345")
-            specialties: List of taxonomy descriptions to search for
-            limit_per_specialty: Max results per specialty
+            zip_code: Postal code; only the first five digits are used
+            taxonomy_descriptions: NUCC taxonomy descriptions to search for. These are
+                search terms, not HL7 codes -- each practitioner's specialty is derived
+                from their own primary taxonomy. The previous signature was ambiguous
+                and __main__ passed HL7 codes, so NPPES was queried with
+                taxonomy_description=MED and matched nothing.
+            limit_per_specialty: Max results per search term
 
         Returns:
-            Structured list of doctor records
+            List of doctor records with id, surname, firstname, prefix and specialty
         """
         doctors: list[dict[str, Any]] = []
-        seen = set()
-        for specialty in specialties:
+        seen: set[str] = set()
+        for description in taxonomy_descriptions:
             params = {
-                "taxonomy_description": specialty,
-                "postal_code": zip_code,
+                "taxonomy_description": description,
+                "postal_code": zip_code[:5],
+                # Individuals only; without this an organizational NPI can be returned
+                # and written into doctors.yml as a person.
+                "enumeration_type": "NPI-1",
                 "limit": limit_per_specialty,
                 "version": "2.1",
             }
             data = self._request_with_backoff(params)
             for result in data.get("results", []):
                 basic = result.get("basic", {})
-                first = basic.get("first_name", "")
-                last = basic.get("last_name", "")
-                doctor_id = result.get("number") or f"{last}-{first}-{specialty}"
-                if doctor_id in seen:
+                npi = result.get("number")
+                if not npi or npi in seen:
                     continue
-                seen.add(doctor_id)
+                seen.add(npi)
+
+                taxonomies = result.get("taxonomies") or []
+                primary = next(
+                    (t for t in taxonomies if t.get("primary")),
+                    taxonomies[0] if taxonomies else None,
+                )
+                practitioner_desc = (primary or {}).get("desc") or description
+
                 doctors.append(
                     {
-                        "id": doctor_id,
-                        "surname": last,
-                        "firstname": first,
-                        "prefix": basic.get("middle_name", ""),
-                        "specialty": specialty,
+                        "id": npi,
+                        "surname": basic.get("last_name", ""),
+                        "firstname": basic.get("first_name", ""),
+                        # Individual records carry name_prefix, not middle_name; reading
+                        # middle_name always yielded an empty prefix.
+                        "prefix": basic.get("name_prefix") or "Dr",
+                        "specialty": get_hl7_code(practitioner_desc),
                     }
                 )
             time.sleep(0.5)
