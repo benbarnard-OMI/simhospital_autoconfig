@@ -1,288 +1,279 @@
 # Project Progress — simhospital_autoconfig
 
-_Last updated: 2026-10-31, end of session 2. Supersedes the session-1 snapshot._
+_Last updated: 2026-10-31, end of session 2._
 
 ## TL;DR
 
-Session 1 (2026-09-18) built a ~3,700 LOC generator package and left **all of it
-uncommitted**. Session 2 (2026-10-31) committed it on branch `chore/stabilize`, fixed the
-environment and CI so the suite actually runs, and established a measured baseline:
-**77 passed** (with API keys present) / **70 passed, 7 skipped** (offline).
+Session 1 (2026-09-18) built a ~3,700 LOC generator package and left all of it uncommitted.
+Session 2 (2026-10-31) committed it on `chore/stabilize`, made the test suite and CI actually
+runnable, and then found that **the project's central claim did not hold**: of the three
+advertised data sources only NPPES had ever worked. Census returned an HTML "Missing Key"
+page on every call and CMS returned `410 Gone`, both swallowed by broad `except` blocks — so
+every "generated" fixture was really NPPES data wrapped in London defaults, plus two invented
+doctors.
 
-Session 2 also found that the project's central claim does not yet hold: **only one of the
-three advertised data sources has ever worked.** Census and CMS both fail silently, so every
-"generated" fixture is really NPPES data wrapped in UK defaults. Details in
-[Data source status](#data-source-status) — this is the main outstanding work.
+All of that is now fixed and verified against the live APIs and the real simulator.
 
-Nothing has been pushed. No PR has been opened.
+```
+Baseline      107 passed, 7 skipped (offline)  ·  114 passed (with API keys)  ·  ruff clean
+Deterministic 17/17 checks pass on freshly generated output
+Simulator     make validate-simulator exits 0 in ~48s against real generated configs
+Branch        chore/stabilize, 15 commits ahead of main, NOT pushed, no PR
+```
 
 ---
 
-## Current state
+## What changed in session 2
+
+### Environment and CI (was: unusable)
+
+| Problem | Fix |
+|---|---|
+| `.venv` built for 3.12 but `.venv/bin/python` resolved to 3.14 → every package invisible | recreated on CPython 3.12.12 via `uv` |
+| pytest aborted with **51 collection errors** from `simhospital/bazel-*` symlinks | `norecursedirs` in pyproject |
+| `vcrpy<6` incompatible with urllib3 2.x → `test_e2e` errored | pin relaxed to `>=6.0` |
+| CI installed deps the tests don't have (`vcr`, `requests_mock`, `typesafe_sdk`) | CI installs `.[dev]`; new `typesafe` extra; `requirements.txt` synced |
+| ruff unpinned with no declared rule set → 201 findings, results drift with ruff version | `ruff==0.17.3` pinned, rule set declared explicitly |
+| 9 TypeSafe tests made live API calls with no guard | `importorskip` + key check → suite passes offline |
+| API key literal committed in a test file | moved to gitignored `.env`; `.env.example` committed; scan confirms no key in any git-visible file |
+
+**The test suite had never been runnable as configured.** The "46 passed, 0 skipped" figure
+quoted in session 1 was a literal string inside `test_plan_completeness_is_high`, not a
+measurement. The first real run gave 76 passed + 1 error.
+
+### Data sources (was: 1 of 3 working)
+
+**Census — three independent defects, all fixed.**
+1. `get_demographics()` requested only `NAME,B01001_*` but then read `B03002_*`, so every
+   ethnicity count was always `0`. The mock returned those columns anyway, hiding it.
+2. `RACE_ETHNICITY_MAP` misassigned **every** variable. Checked against the authoritative ACS
+   labels: `B03002_002E` is the *not*-Hispanic total but was mapped to `H` (Hispanic), which
+   would have reported a 93%-non-Hispanic ZCTA as 93% Hispanic. Rewritten to HL7 Table 0005 /
+   CDC codes that partition the total exactly.
+3. Adding B03002 took the request to 58 variables against a **50-variable API cap** (the old
+   request was already at exactly 50) → HTTP 400. The 49 age-band variables were never read by
+   any generator, so they were dropped rather than split into a second request.
+
+Also: fails fast with an actionable message when the key is missing (previously three retries
+against an HTML error page, then a silent UK fallback); clamps ACS negative sentinels; ACS year
+parameterized, default 2023.
+
+Verified live — and the two candidate ZCTAs disagree sharply:
+
+| ZCTA | Profile |
+|---|---|
+| **60612** (the hospital) | 54.0% Black, 22.1% White, 16.1% Hispanic, 4.4% Asian |
+| **60601** (what the fixtures used) | 54.1% White, 28.1% Asian, 6.5% Hispanic |
+
+**CMS — endpoint was retired, not the dataset.** `xubh-q36u` is alive in the Provider Data
+Catalog; only the Socrata `/resource/*.json` API was decommissioned. Now resolved through two
+metastore hops to a versioned bulk CSV (the URL's version token changes on every refresh, so it
+cannot be hardcoded), downloaded once and filtered locally because **the catalog's server-side
+filtering does not work** (`filter[...]` silently ignored, `conditions[...]` fails schema
+validation). Verified against all 5,419 rows.
+
+`Emergency Services` is `"Yes"`/`"No"`, and the old comparison was `.lower() == "y"` — false for
+`"yes"`, so ED was reported absent for all **4,495** hospitals that have one. Now normalizes
+correctly (4,495 `Yes` → 4,495 `True`).
+
+**Doctors — could never have been populated.** `fetch_doctors_by_location` was documented as
+taking taxonomy *descriptions* but was passed HL7 *codes*, so NPPES was queried with
+`taxonomy_description=MED`. Individual records carry `name_prefix`, not `middle_name`, so
+`prefix` was always empty; and there was no `enumeration_type` filter, so an organizational NPI
+could be written in as a person. Now searches a fixed clinical roster (a hospital's own NPPES
+taxonomies are organizational — Stroger's sole entry is "General Acute Care Hospital", which
+matches no individual practitioners) and derives each practitioner's HL7 code from their own
+taxonomy. Verified live: **138 real practitioners** for ZIP 60612.
+
+**Specialty codes.** `NUCC_TO_HL7_MAP` spans 688 descriptions and 584 distinct codes, but
+`ALLOWED_SPECIALTIES` admits 14 — so 88% of the mapping produced codes the validators reject.
+`get_hl7_code` now coerces into the allowed set. Verified: all 688 descriptions resolve to
+exactly the 14 allowed codes. Caveat: 587 land on `MED`, expected since most of those 584 codes
+are dental, DME and non-clinical services with no hospital-service counterpart.
+
+**`hospital_service` was a NUCC code.** Generated `hl7.yml` carried `282N00000X` where HL7 Table
+0069 expects `MED`. Now mapped through `get_hl7_code`.
+
+### Generated output
+
+`ethnicity.csv` **replaces** the UK defaults rather than appending to them — the two ID spaces
+collided on `A`, `B` and `H`, and Simhospital's loader accepts duplicate CE IDs silently, so
+the corruption never surfaced. Zero-count rows dropped, frequencies scaled to ~1000, header
+cites the ACS release and ZCTA instead of the Wikipedia London article. New `addresses.py`
+supplies USPS street suffixes (confirmed against the Go generator that `streets` holds
+*suffixes*, not full names) replacing the UK list.
+
+### Deterministic checks (the session goal)
+
+Were fixture-scoped and structural: they reported confidence **1.0** on output that was London
+ethnicity data with invented doctors. Now parameterized by `config_dir`, with seven new checks
+targeting exactly those blind spots — duplicate CE IDs, non-positive frequencies, unconverted UK
+ethnicity, unconverted UK street suffixes, placeholder doctors, duplicate doctor NPIs, and a
+`hospital_service` outside Table 0069. 25 dedicated unit tests cover both directions.
+
+Proof they earn their keep, same code run against both directories:
 
 ```
-Branch    chore/stabilize  (7 commits ahead of main; NOT pushed)
-Base      main == origin/main @ 8a82936
-Tests     77 passed (keys present) · 70 passed + 7 skipped (offline) · ~3s
-Python    .venv recreated on CPython 3.12.12 via uv
-Working tree  clean except README.md (modified) and docs/ (this file)
+stale session-1 fixtures    13/16   confidence 0.812   (names UK streets, UK ethnicity,
+                                                        placeholder doctors)
+freshly generated output    17/17   confidence 1.000
 ```
 
-Commits on `chore/stabilize`:
+Wired into `generate_all_configs(..., validate=True)` so it gates **generated output**, and into
+the CLI with a new `--strict` flag (warn by default, since a degraded source still yields usable
+configs; exit 1 under `--strict`).
 
-| SHA | Chunk |
+### Simulator validation (was: never ran, could never fail)
+
+Two defects made it inert. The script looked for the binary at `$PROJECT_ROOT/simulator` but
+`go build` puts it at `simhospital/simulator`, so it fell through to Docker and — with Docker
+absent — printed a warning and **exited 0**, which CI then also swallowed via
+`continue-on-error`. And `--local_path` was the config dir's *parent*; that flag is the base for
+Simhospital's own relative defaults (`configs/hardcoded_messages`), so the simulator aborted
+before reading a single generated file.
+
+Now real: parses all five generated files, loads 3 locations and 138 doctors, runs pathways,
+shuts down on the timeout. Also `timeout --kill-after=10s`, because the simulator logs
+"Shutting down gracefully" on SIGTERM and then hangs; and `generate_and_validate.sh` no longer
+leaks its temp directory on failure (a bare call under `set -e` aborted before cleanup).
+
+**Scope of this evidence:** it proves the configs are *accepted and loaded*. It does not verify
+HL7 message content — the simulator writes to an HL7 sink, not stdout, so nothing asserts on
+generated messages.
+
+---
+
+## Test results
+
+```
+$ pytest -q                                  # offline / CI equivalent
+107 passed, 7 skipped in 2.53s
+
+$ pytest -q                                  # CENSUS_API_KEY + TYPESAFE_API_KEY set
+114 passed in 4.69s
+
+$ ruff check simhospital_autoconfig tests
+All checks passed!
+
+$ make validate-simulator
+exit 0 in ~48s; "All 17 deterministic checks passed"
+```
+
+The 7 skipped are `TestTypeSafeConfigAudit`, which call `api.typesafe.ai` live — confirmed real
+by running them against an invalid key: all 7 fail with `TypeSafeAuthenticationError: 401`.
+
+Growth: 68 test functions at session start (never runnable) → 114 passing.
+
+---
+
+## Remaining work
+
+**Features (D10) — the only planned work not done.**
+`--name/--state` and `--zip` still log an error and `return 1`. The CMS side is ready
+(`search_hospitals`, `get_hospital_by_zip` exist and are tested); what's missing is
+`search_organizations()` in `nppes.py` and the CLI wiring. `--zip` needs a decision on which
+facility to use when a ZCTA holds several (60612 has four: Jesse Brown VA, Rush, Stroger,
+University of Illinois) — the current code returns the list and refuses to guess.
+
+**Known limitation (new, D13).** The canonical hospital does not resolve in CMS. NPPES names NPI
+`1730209545` **"COOK COUNTY"** (the legal entity) while the catalog says **"JOHN H STROGER JR
+HOSPITAL"**, and NPPES publishes no CCN for it — only a Medicaid identifier. So the name+state
+join fails, the CLI warns, and `locations.yml` for the fixture still uses built-in defaults.
+Fixing this needs either a fuzzy/alias match or a CCN source; it is deliberately not guessed at.
+
+**Housekeeping.**
+- Rotate the TypeSafe and Census keys when convenient. Both live only in the gitignored `.env`
+  now, but the TypeSafe key was pasted into the session transcript.
+- README "Data Sources" still points at `data.cms.gov` generically and doesn't state that Census
+  requires a key or that CMS is resolved through the Provider Data Catalog.
+- `roan-stranger` branch and `.kilo/worktrees/roan-stranger` are stale and prunable (needs
+  explicit approval — pruning deletes a branch).
+- `dist/` holds a 0.1.0 wheel+sdist predating all of this. Gitignored, harmless.
+- `scripts/` is not covered by the ruff config's lint target (CI lints `simhospital_autoconfig`
+  and `tests` only) and still has ~19 findings.
+
+---
+
+## Session 2 commits (`chore/stabilize`, not pushed)
+
+| SHA | Summary |
 |---|---|
 | `860929b` | chore: ignore vendored simulator clone, agent tooling, scratch output |
-| `91d74db` | build: packaging, CI, dev tooling (+ pytest collection and vcrpy fixes) |
-| `f9a5559` | feat: US hospital config generator package |
+| `91d74db` | build: packaging, CI, dev tooling (+ pytest collection, vcrpy pin) |
+| `f9a5559` | feat: US hospital config generator package (as-is restore point) |
 | `2288ae7` | test: generator, schema, edge-case, e2e suites |
 | `8b74760` | feat: simulator validation and cassette recording scripts |
 | `3b4d306` | test: hl7/locations validators + ethnicity sentinel enforcement |
-| _(pending)_ | docs: progress report, archived session plans, README |
+| `be3ea7d` | docs: progress report, archived session plans, README |
+| `0f0991b` | style: declare lint rule set; fix 84 duplicate mapping keys |
+| `e7e4dc1` | fix(census): correct B03002 mapping and request the variables |
+| `1020404` | fix(generators): US ethnicity and address data instead of UK defaults |
+| `1659654` | fix(cms): Provider Data Catalog; stop reporting ED as absent |
+| `7d49690` | fix(specialties,nppes): constrain HL7 codes; search doctors by taxonomy |
+| `6d5a540` | feat(checks): gate generated output; regenerate fixtures from real data |
+| `9128f27` | fix(scripts): make simulator validation actually run and actually fail |
+| _(this)_ | test + docs for the deterministic checks |
 
-The package was committed **as-is, bugs included**, to create a restore point before any
-behaviour changes. Data-correctness fixes belong in follow-up commits.
-
----
-
-## What exists
-
-### Package — `simhospital_autoconfig/` (2,430 LOC)
-
-| Module | LOC | Role | Status |
-|---|---|---|---|
-| `specialties.py` | 808 | NUCC taxonomy → HL7 Table 0069 | works |
-| `generators.py` | 716 | five per-file generators + `generate_all_configs()` | emits UK defaults, see defects |
-| `nppes.py` | 259 | NPI org lookup, practitioner search, 429 backoff | **works** |
-| `__main__.py` | 184 | `generate` CLI | only `--npi` implemented |
-| `deterministic_checks.py` | 181 | 10 local validation rules | fixture-scoped, not a generator gate |
-| `census.py` | 162 | ACS 5-year demographics by ZCTA | **broken** (3 defects) |
-| `cms.py` | 117 | CMS Hospital General Information | **broken** (dead endpoint) |
-
-### Tests — 77 test functions across 12 files
-
-Root level (318 LOC) validates the **checked-in upstream** config files:
-`test_locations_yml` 7, `test_data_yml` 4, `test_hl7_yml` 3, `test_doctors` 2,
-`test_ethnicity_csv` 2, `test_yaml_files` 2 (parametrized ×5).
-
-`tests/` (985 LOC) exercises the **generator**: `test_edge_cases` 26,
-`test_typesafe_validation` 9, `test_schema_validation` 5, `test_integration_cms` 4,
-`test_e2e` 2, `test_integration_census` 2.
-
-Offline data: `tests/fixtures/1730209545/` (five generated configs) and
-`tests/cassettes/test_simulator_validation[1730209545].yaml` (61 KB, replayed with
-`record_mode="none"`).
-
-### Tooling
-
-`scripts/{validate_with_simulator.sh, generate_and_validate.sh, record_cassettes.py}`,
-`Makefile` (`test`, `lint`, `validate-simulator`), hardened GitHub Actions workflow,
-`pyproject.toml` with `dev` and `typesafe` extras, `MANIFEST.in`, `CONTRIBUTING.md`.
-
-Vendored reference: `simhospital/` — google/simhospital @ `e69eef7` with a built 89 MB
-`simulator` binary. Now gitignored.
+The package was committed **as-is, bugs included**, at `f9a5559` to create a restore point
+before any behaviour changed. Every fix after that is its own commit with the evidence in the
+message.
 
 ---
 
-## Verified test results (2026-10-31)
+## Reference: verified external facts
 
-```
-$ pytest -q                                   # CENSUS/TYPESAFE keys present via .env
-77 passed in 3.05s
+Recorded here because they were expensive to discover and are not obvious from the code.
 
-$ TYPESAFE_API_KEY= pytest -q                 # offline / CI equivalent
-70 passed, 7 skipped in 1.41s
-```
+**Census ACS** (`api.census.gov`)
+- Requires a key. Keyless calls return HTTP 200 with an HTML "Missing Key" page, not an error.
+- Max **50 variables** per `get`; exceeding it returns HTTP 400.
+- B03002 structure: `002` = *not*-Hispanic total, `003`–`009` = non-Hispanic races,
+  `012` = Hispanic total, `013`–`021` = Hispanic sub-breakdowns.
+- ACS 2021 and 2023 both serve ZCTA data as of 2026-10.
+- Unavailable estimates come back as large negative sentinels (e.g. `-666666666`).
 
-The session-1 claim of "46 passed, 0 skipped" — which was a literal string inside
-`test_plan_completeness_is_high`, not a measured result — is superseded by the above.
+**CMS Provider Data Catalog** (`data.cms.gov/provider-data`)
+- Dataset `xubh-q36u` "Hospital General Information", 5,419 rows, 38 columns, 1.4 MB CSV.
+- Metadata: `GET /api/1/metastore/schemas/dataset/items/xubh-q36u?show-reference-ids=true`
+  → `distribution[0].identifier` → `GET /api/1/metastore/schemas/distribution/items/{id}`
+  → `data.downloadURL`.
+- **Akamai returns 403 for browser-like User-Agents**; `curl/8.5.0` and `python-requests` work.
+- **Server-side filtering does not work.** `filter[field][value]=` is ignored; `conditions[...]`
+  fails JSON-schema validation. Both return all 5,419 rows.
+- Columns are human-readable (`Facility ID`, `Facility Name`, `City/Town`, `ZIP Code`,
+  `Hospital Type`, `Emergency Services`). No NPI column exists.
+- `Emergency Services` ∈ {`Yes`, `No`}; 4,495 / 924 across the catalog.
+- Stroger: `Facility ID 140124`, 1901 W Harrison St, Chicago IL **60612**, Acute Care Hospitals,
+  Government - Local, Emergency Services = Yes.
 
-The 7 skipped tests are `TestTypeSafeConfigAudit`, which make **live calls to
-`api.typesafe.ai`**. This was confirmed by running them against an invalid key: all 7 fail
-with `TypeSafeAuthenticationError: 401`. They are now behind `pytest.importorskip` plus a
-key check, restoring plan 3's "suite passes offline" criterion.
+**NPPES** (`npiregistry.cms.hhs.gov/api/`)
+- Individual (NPI-1) `basic` carries `name_prefix`, `credential`, `first_name`, `last_name`,
+  `sex`. There is **no** `middle_name` on individuals.
+- NPI `1730209545` → organization_name **"COOK COUNTY"**, MAILING 1110 S Oakley Blvd 60612-4218,
+  LOCATION 1901 W Harrison St 60612-3714, one taxonomy `282N00000X` "General Acute Care
+  Hospital", one identifier (`05`/MEDICAID). No CCN.
 
-`run_deterministic_checks()` also verified directly: 10/10 PASS, confidence 1.0 — but only
-against the checked-in fixtures, which is itself the problem (see defect D8).
-
----
-
-## Data source status
-
-Decoded the recorded cassette interaction-by-interaction. Of three sources, one works:
-
-| Source | Recorded result | Effect |
-|---|---|---|
-| **NPPES** | `200 OK`, real Stroger data (1110 S Oakley Blvd) | ✓ working |
-| **CMS** | **`410 Gone`** | `hospital_data = None` → locations.yml uses hardcoded defaults |
-| **Census** | `302` → "Missing Key" HTML, ×4 | `demographics = None` → ethnicity.csv and streets stay UK defaults |
-
-Both failures were swallowed by `try/except` in `__main__.py` and `record_cassettes.py`, so
-generation "succeeded" while producing London-derived data for a Chicago hospital.
-
-### CMS — diagnosed and solved
-
-`xubh-q36u` was never retired; the **Socrata `/resource/*.json` API** was decommissioned.
-The dataset is alive in the Provider Data Catalog. Verified live on 2026-10-31:
-
-```
-Catalog metadata   GET  https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/xubh-q36u
-Rows (unfiltered)  GET  https://data.cms.gov/provider-data/api/1/datastore/query/xubh-q36u/0?limit=1
-Bulk CSV (1.4 MB)  resolved via  /metastore/schemas/distribution/items/<distribution-id>
-                   → data.downloadURL
-```
-
-Gotchas found by probing:
-- **Akamai returns 403 for browser-like User-Agents.** `curl/8.5.0` works; `Mozilla/5.0`
-  does not. Any client must not send a browser UA.
-- **Server-side filtering does not work.** `filter[field][value]=` is silently ignored and
-  `conditions[...]` fails JSON-schema validation — both return the full unfiltered 5,419
-  rows. Plan on downloading the bulk CSV and filtering locally.
-- The bulk CSV `downloadURL` embeds a version token (`..._1785189955`) that changes on each
-  data refresh, so it must be **resolved via the metastore at runtime**, never hardcoded.
-- CSV headers are human-readable (`Facility ID`, `Facility Name`, `City/Town`, `ZIP Code`,
-  `Hospital Type`, `Emergency Services`), not the old Socrata snake_case names.
-- `Emergency Services` is **`"Yes"` / `"No"`**, not `"Y"` / `"N"`.
-
-Real row for the canonical hospital: **`Facility ID 140124`, JOHN H STROGER JR HOSPITAL,
-1901 W HARRISON ST, CHICAGO, IL, ZIP 60612**, Cook County, Acute Care Hospitals.
-
-### Census — key obtained, three code defects remain
-
-A working key is now in the gitignored `.env`. Verified live: ACS 2021 **and** 2023 both
-return data for ZCTA 60601.
-
-For ZCTA 60601 (ACS 2023): total 16,292; `B03002_002E` 15,227; `B03002_008E` 56;
-`B03002_009E` 805; `B03002_011E` 417.
-
-Checked against the authoritative ACS group labels
-(`https://api.census.gov/data/2021/acs/acs5/groups/B03002.json`), `B03002_002E` is
-**"Not Hispanic or Latino"**, so 15,227/16,292 ≈ 93% non-Hispanic is correct for the Loop.
-`RACE_ETHNICITY_MAP` labels that variable `"H"` (Hispanic) — the mapping would report 93%
-Hispanic. See defect D2.
-
----
-
-## Outstanding defects
-
-Ordered by how much they undermine the project's premise.
-
-**D1 — `census.py` never requests the variables it reads.** `get_demographics()` builds
-`get=NAME,B01001_*` only, then reads `B03002_*` from the response, so every ethnicity count
-is always `0`.
-
-**D2 — `RACE_ETHNICITY_MAP` is wrong on every entry.** Verified against ACS labels:
-`002`=NH-total (mapped to `H`), `003`=NH-White (mapped to `HM`), `004`=NH-Black (mapped to
-`HP`), `005`=NH-AIAN (mapped to `HL`), `006`=NH-Asian (mapped to `HO`), `008`=NH-SomeOther
-(mapped to `W`), `009`=NH-TwoOrMore (mapped to `B`), `011`=NH-TwoRacesExcl (mapped to `A`),
-`012`=Hispanic-total (mapped to `NH`), `013`=Hispanic-White (mapped to `SR`),
-`014`=Hispanic-Black (mapped to `TM`). `007` (NH-Native Hawaiian) is absent entirely.
-Fixing D1 without D2 would start producing confidently inverted demographics.
-
-**D3 — `cms.py` points at a dead endpoint.** `data.cms.gov/resource/xubh-q36u.json` returns
-410. Needs the PDC endpoint, the field renames above, and `emergency_services == "Yes"`
-(currently `.lower() == "y"`, which is always False — so ED is always treated as absent).
-
-**D4 — Duplicate CE codes in generated `ethnicity.csv`.** `generate_ethnicity_csv()` appends
-Census rows to the UK defaults, and the code spaces collide: UK `A` = "White - British" vs
-Census `A` = Asian; `B`, `H` likewise. Simhospital's loader accepts duplicates without error
-(`pkg/config/csv.go` builds a weighted distribution, `ir.Ethnicity{ID,Text}` are free-form
-strings), so this silently corrupts patient ethnicity rather than failing.
-
-**D5 — Wrong ZCTA.** The CLI derives the ZCTA from the NPPES postal code, which for Stroger
-is the **administrative** address 1110 S Oakley Blvd → `60601`. The hospital itself is at
-1901 W Harrison St → **`60612`**. Demographics would be pulled for the wrong neighbourhood
-even after D1–D3 are fixed. Prefer the CMS facility ZIP when available.
-
-**D6 — `data.yml` still emits London data.** `streets` is the upstream UK list
-(Road/Street/Lane/Avenue/Place/Square) and the header comment still cites
-`en.wikipedia.org/wiki/Ethnic_groups_in_London`. `addresses.py` (plan 2 step 6) was never
-created.
-
-**D7 — Fixture `doctors.yml` is fabricated.** It contains two invented records
-(`John Smith`, `Jane Doe`, ids `1730209545-1/-2`) that no code path produces:
-`record_cassettes.py` calls `generate_all_configs()` **without** `doctors=`, so it never
-writes that file. Three tests validate this fake data as if it were real.
-
-**D8 — Deterministic checks are fixture-scoped.** `FIXTURE_DIR` is hardcoded to
-`tests/fixtures/1730209545`, so the "confidence 1.0" result audits checked-in files, not
-generated output. None of D1–D7 would be caught by the current 10 checks — they all pass on
-data that is London-derived and partly fabricated.
-
-**D9 — Simulator validation can silently pass.** `validate_with_simulator.sh` looks for
-`$PROJECT_ROOT/simulator`, but the binary is at `simhospital/simulator`, so it falls through
-to Docker and `exit 0` when Docker is absent. Combined with `continue-on-error: true` in CI,
-the job proves nothing.
-
-**D10 — CLI gaps.** `--name/--state` and `--zip` log an error and `return 1`. `--zip` also
-depends on D3.
-
----
-
-## Resolved this session
-
-| Was | Now |
-|---|---|
-| ~3,700 LOC uncommitted, one `git clean -fdx` from loss | 7 commits on `chore/stabilize` |
-| API key literal in `tests/test_typesafe_validation.py` | moved to gitignored `.env`; `.env.example` committed; scan confirms no key in any git-visible file |
-| `.venv` unusable (3.12 site-packages, 3.14 interpreter) | recreated on CPython 3.12.12 via `uv` |
-| pytest aborted with 51 collection errors from `simhospital/bazel-*` | `norecursedirs` added |
-| `test_e2e` errored: vcrpy 5.x vs urllib3 2.x | pin relaxed to `vcrpy>=6.0` (9.2.0 installed) |
-| CI installed deps the tests don't have | CI installs `.[dev]`; `requirements.txt` synced; `typesafe` extra added |
-| TypeSafe tests required network with no guard | `importorskip` + key check → 70 passed, 7 skipped offline |
-| `simhospital/`, `.kilo/` untracked and not ignored | both gitignored; session plans archived to `docs/plans/` |
-| CMS replacement unknown | endpoint, field names, and gotchas verified live |
-
----
-
-## Next steps
-
-**Data correctness (the real work):**
-1. `census.py` — request the `B03002_*` variables (D1) **and** rewrite the mapping against
-   the verified ACS labels (D2); parameterize the ACS year (2021 and 2023 both live, default
-   2023); raise a clear error when the key is missing instead of retrying an HTML error page.
-2. `cms.py` — PDC endpoint, metastore-resolved bulk CSV, local filtering, field renames,
-   `emergency_services == "Yes"` (D3).
-3. `generate_ethnicity_csv()` — replace rather than append to the UK defaults; use HL7
-   Table 0005 / CDC race codes (`2106-3`, `2054-5`, `2028-9`, `1002-5`, `2076-8`, `2135-2`,
-   `2186-5`) so they cannot collide with `A`–`Z`; drop zero rows; normalize to 1000; cite ACS
-   in the header (D4).
-4. `addresses.py` — extract ~20 US street names + city patterns; use in `generate_data_yml` (D6).
-5. Prefer the CMS facility ZIP over the NPPES administrative ZIP for the ZCTA (D5).
-6. `record_cassettes.py` — pass `doctors=` from `fetch_doctors_by_location()` so fixtures are
-   real; re-record the cassette and regenerate `tests/fixtures/` (D7). **Grep the new cassette
-   for the Census key before committing.**
-
-**Then:**
-7. Deterministic checks (D8) — parameterize `run_deterministic_checks(config_dir=None)`; add
-   checks that would have caught the above: duplicate CE IDs, non-positive frequencies,
-   London-default ethnicity/streets despite available Census data, placeholder doctors.
-   Wire into `generate_all_configs(..., validate=True)` so it gates generated output; CLI
-   reports results and gains `--strict`.
-8. Simulator validation (D9) — point the script at `simhospital/simulator`, fail loudly when
-   `SIMULATOR_VALIDATION=true` and neither Docker nor the binary is present, drop
-   `continue-on-error`, and actually run `make validate-simulator`.
-9. Features (D10) — `search_organizations_by_name()` in `nppes.py` (error listing candidates
-   on multiple matches, never silently pick), `get_hospital_by_zip()` in `cms.py`, implement
-   both CLI branches.
-
-**Housekeeping:** update the README's Data Sources section to name the PDC endpoint and note
-that Census requires a key; the stale `roan-stranger` branch and
-`.kilo/worktrees/roan-stranger` worktree are prunable with explicit approval; `dist/` holds a
-stale 0.1.0 wheel predating all of this.
+**Simhospital** (vendored at `simhospital/`, upstream `e69eef7`)
+- `pkg/config/csv.go`: `reader.Comment = '#'`, so comment lines are skipped; rows whose
+  non-frequency columns are all `nil` become a nil value (the `nil,nil` sentinel); duplicate CE
+  IDs are **accepted silently** into the weighted distribution.
+- `pkg/generator/address/address.go`: the `streets` config key holds *street suffixes*
+  ("Road", "Street", "Place"), sampled directly; addresses render as `<number> <noun> <suffix>`.
+- `ir.Ethnicity{ID, Text}` are free-form strings, so dashed CDC codes like `2106-3` are valid.
+- `--local_path` is the base for the simulator's own relative defaults, not the config directory.
 
 ---
 
 ## Archive
 
-Session-1 plans that drove the original build, copied out of `.kilo/plans/` before it was
-gitignored:
+Session-1 plans, copied out of `.kilo/` before it was gitignored:
 
 - `docs/plans/01-adversarial-remediation.md` — 3 steps, all completed in session 1.
-- `docs/plans/02-build-us-hospital-config-generator.md` — 14 steps; 1–5, 7–9, 11, 13, 14
-  done. Gaps: step 6 (`addresses.py`), step 10 (two CLI branches), step 12 (pre-commit/tox).
-- `docs/plans/03-prove-generator-with-real-simulator.md` — 6 steps, all nominally done, but
-  its exit criterion "all tests pass offline" was not met until this session, and its
-  "simulator validated" claim rests on D9.
-- `docs/typesafe_plan.md` — four-layer Jev strategy; deliverables exist, Layer 3 runs only
-  inside tests (D8).
+- `docs/plans/02-build-us-hospital-config-generator.md` — 14 steps; all now done except step 10's
+  two CLI branches and step 12's optional pre-commit/tox. Step 6's `addresses.py` landed in
+  session 2.
+- `docs/plans/03-prove-generator-with-real-simulator.md` — 6 steps. Its exit criteria were only
+  genuinely met in session 2: the suite did not pass offline, and simulator validation had never
+  run.
+- `docs/typesafe_plan.md` — four-layer Jev strategy. Layer 1 is now a real gate on generated
+  output; Layer 3 remains test-only and requires network plus a key.
