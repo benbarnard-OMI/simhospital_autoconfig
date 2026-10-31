@@ -30,9 +30,46 @@ simhospital-autoconfig generate --npi 1730209545 --output-dir ./config
 
 Supported input types:
 
-- `--npi <NPI>` — Primary workflow. Fetches hospital data from NPPES by NPI number.
-- `--name "<Hospital Name>" --state <XX>` — Fallback search via NPPES (name/state search not yet implemented).
-- `--zip <ZIP>` — Resolve ZIP to ZCTA, then fetch hospital via CMS (not yet implemented).
+- `--npi <NPI>` — Primary workflow and the most reliable. Fetches the hospital from NPPES by NPI.
+- `--zip <ZIP> [--name <fragment>] [--state <XX>]` — Resolves the ZIP through the CMS catalog. A ZIP often holds several hospitals (60612 holds four), so narrow it with `--name`.
+- `--name "<Hospital Name>" --state <XX>` — Searches NPPES by legal business name. Works, but see the caveats below.
+
+```bash
+# Several hospitals share this ZIP, so narrow it:
+simhospital-autoconfig generate --zip 60612 --name stroger --output-dir ./config
+```
+
+### Ambiguity is never guessed at
+
+Every path refuses to pick a facility when the match is not unique. Candidates are listed
+with their identifiers and the command exits non-zero, so you can re-run with `--npi`:
+
+```
+ERROR - 4 CMS facilities are in ZIP 60612:
+ERROR -   CCN 14003F  JESSE BROWN VA MEDICAL CENTER - VA CHICAGO HEALTHCARE SYSTEM  (Acute Care - Veterans Administration, ED: Yes)
+ERROR -   CCN 140119  RUSH UNIVERSITY MEDICAL CENTER  (Acute Care Hospitals, ED: Yes)
+ERROR -   CCN 140124  JOHN H STROGER JR HOSPITAL  (Acute Care Hospitals, ED: Yes)
+ERROR -   CCN 140150  UNIVERSITY OF ILLINOIS HOSPITAL AND CLINICS  (Acute Care Hospitals, ED: Yes)
+ERROR - Narrow it with --name, or re-run with --npi <NPI>; this tool will not guess.
+```
+
+### Why `--name` is the weakest of the three
+
+NPPES matches on the **legal business name**, not the name a hospital is known by, and the
+match is fuzzy:
+
+- `--name "John H. Stroger Jr. Hospital" --state IL` finds **nothing** — that facility is
+  registered as `COOK COUNTY`. The error message says so and suggests the legal entity.
+- `--name "RUSH UNIVERSITY MEDICAL CENTER" --state IL` finds **73** exact matches; large
+  health systems register many NPIs under one legal name, across campuses and departments.
+
+Prefer `--npi`, or `--zip --name`, which resolves through CMS (one row per facility) and uses
+NPPES only to pick up taxonomies.
+
+When `--zip` resolves a facility in CMS but cannot join it to exactly one NPPES record, the
+CMS row is used on its own: `hl7.yml`'s `id_number` becomes the CCN and `hospital_service`
+defaults to `MED`, because there are no taxonomies to derive it from. That substitution is
+logged as a warning rather than happening silently.
 
 Additional options:
 

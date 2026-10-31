@@ -38,7 +38,7 @@ To load `.env` into the current shell: `set -a; . ./.env; set +a`
 5. Run the test suite:
 
 ```bash
-pytest -v        # 107 passed, 7 skipped without API keys
+pytest -v        # 141 passed, 7 skipped without API keys
 ```
 
 6. Validate generated configs against the real simulator:

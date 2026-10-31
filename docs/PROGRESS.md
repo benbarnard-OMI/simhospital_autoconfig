@@ -15,10 +15,11 @@ doctors.
 All of that is now fixed and verified against the live APIs and the real simulator.
 
 ```
-Baseline      107 passed, 7 skipped (offline)  ·  114 passed (with API keys)  ·  ruff clean
+Baseline      141 passed, 7 skipped (offline)  ·  148 passed (with API keys)  ·  ruff clean
 Deterministic 17/17 checks pass on freshly generated output
 Simulator     make validate-simulator exits 0 in ~48s against real generated configs
-Branch        chore/stabilize, 15 commits ahead of main, NOT pushed, no PR
+CLI           all three input paths work: --npi, --zip [--name], --name --state
+Branch        chore/stabilize, ahead of main, NOT pushed, no PR
 ```
 
 ---
@@ -147,10 +148,10 @@ generated messages.
 
 ```
 $ pytest -q                                  # offline / CI equivalent
-107 passed, 7 skipped in 2.53s
+141 passed, 7 skipped in 3.4s
 
 $ pytest -q                                  # CENSUS_API_KEY + TYPESAFE_API_KEY set
-114 passed in 4.69s
+148 passed
 
 $ ruff check simhospital_autoconfig tests
 All checks passed!
@@ -162,30 +163,45 @@ exit 0 in ~48s; "All 17 deterministic checks passed"
 The 7 skipped are `TestTypeSafeConfigAudit`, which call `api.typesafe.ai` live — confirmed real
 by running them against an invalid key: all 7 fail with `TypeSafeAuthenticationError: 401`.
 
-Growth: 68 test functions at session start (never runnable) → 114 passing.
+Growth: 68 test functions at session start (never runnable) → 148 passing. The additions are
+`test_integration_census.py` (2→7), `test_integration_cms.py` (4→10), `test_edge_cases.py`
+(+2), `test_deterministic_checks.py` (new, 25), `test_integration_nppes.py` (new, 8) and
+`test_cli.py` (new, 26 — `__main__` had no coverage at all before this).
 
 ---
 
 ## Remaining work
 
-**Features (D10) — the only planned work not done.**
-`--name/--state` and `--zip` still log an error and `return 1`. The CMS side is ready
-(`search_hospitals`, `get_hospital_by_zip` exist and are tested); what's missing is
-`search_organizations()` in `nppes.py` and the CLI wiring. `--zip` needs a decision on which
-facility to use when a ZCTA holds several (60612 has four: Jesse Brown VA, Rush, Stroger,
-University of Illinois) — the current code returns the list and refuses to guess.
+**Features (D10) — done.** All three input paths work: `--npi`, `--zip [--name] [--state]`, and
+`--name --state`. `nppes.search_organizations()` drives the name search; `--zip` resolves through
+the existing `cms.search_hospitals()`. Every path refuses to guess when the match is not unique —
+it lists candidates with their identifiers and exits non-zero.
 
-**Known limitation (new, D13).** The canonical hospital does not resolve in CMS. NPPES names NPI
-`1730209545` **"COOK COUNTY"** (the legal entity) while the catalog says **"JOHN H STROGER JR
-HOSPITAL"**, and NPPES publishes no CCN for it — only a Medicaid identifier. So the name+state
-join fails, the CLI warns, and `locations.yml` for the fixture still uses built-in defaults.
-Fixing this needs either a fuzzy/alias match or a CCN source; it is deliberately not guessed at.
+Two facts established by live testing shape how usable each path is:
+
+- NPPES matches the **legal business name**, fuzzily. `--name "John H. Stroger Jr. Hospital"
+  --state IL` returns nothing (the facility is registered as `COOK COUNTY`), while `--name "RUSH
+  UNIVERSITY MEDICAL CENTER" --state IL` returns **73 exact matches**, because large systems
+  register many NPIs under one legal name across campuses and departments. So `--name` alone is
+  rarely decisive; `--npi` or `--zip --name` is the practical route.
+- `--zip` composes with `--name`/`--state` because `search_hospitals` accepts all three, and CMS
+  holds one row per facility. `--zip 60612 --name stroger` resolves cleanly to CCN 140124, and its
+  output passes 17/17 deterministic checks under `--strict` and is accepted by the real simulator
+  (3 locations, 138 doctors loaded).
+
+**Known limitation (D13), narrowed but not closed.** The CMS↔NPPES join still fails for the
+canonical hospital: NPPES names NPI `1730209545` **"COOK COUNTY"** while the catalog says **"JOHN
+H STROGER JR HOSPITAL"**, and NPPES publishes no CCN for it — only a Medicaid identifier. When
+`--zip` resolves a facility but cannot join it to exactly one NPPES record, it now synthesizes an
+`NPPESResult` from the CMS row: `hl7.yml`'s `id_number` becomes the CCN and `hospital_service`
+defaults to `MED` because there are no taxonomies to derive it from. That substitution is logged
+as a warning, and the ambiguous-join case gets its own message — an earlier version emitted both
+warnings at once, telling the user the record was absent when the real problem was that 73
+matched. Closing D13 properly needs an alias/fuzzy join or another CCN source.
 
 **Housekeeping.**
 - Rotate the TypeSafe and Census keys when convenient. Both live only in the gitignored `.env`
   now, but the TypeSafe key was pasted into the session transcript.
-- README "Data Sources" still points at `data.cms.gov` generically and doesn't state that Census
-  requires a key or that CMS is resolved through the Provider Data Catalog.
 - `roan-stranger` branch and `.kilo/worktrees/roan-stranger` are stale and prunable (needs
   explicit approval — pruning deletes a branch).
 - `dist/` holds a 0.1.0 wheel+sdist predating all of this. Gitignored, harmless.
