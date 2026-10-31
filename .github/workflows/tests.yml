@@ -50,4 +50,3 @@ jobs:
         env:
           SIMULATOR_VALIDATION: "true"
         run: make validate-simulator
-        continue-on-error: true

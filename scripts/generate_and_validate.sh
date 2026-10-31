@@ -10,14 +10,24 @@ VALIDATOR="$SCRIPT_DIR/validate_with_simulator.sh"
 echo "=== Generating configs for NPI $NPI ==="
 cd "$PROJECT_ROOT"
 
-python3 -m simhospital_autoconfig generate \
+# Prefer the project venv; bare python3 only works if the system interpreter
+# happens to have pyyaml and requests installed.
+PYTHON="$PROJECT_ROOT/.venv/bin/python"
+if [ ! -x "$PYTHON" ]; then
+    PYTHON="python3"
+fi
+echo "Using interpreter: $PYTHON"
+
+"$PYTHON" -m simhospital_autoconfig generate \
     --npi "$NPI" \
     --output-dir "$OUTPUT_DIR"
 
 echo ""
 echo "=== Validating configs with simulator ==="
-bash "$VALIDATOR" "$OUTPUT_DIR"
-VALIDATOR_EXIT=$?
+# `|| VALIDATOR_EXIT=$?` rather than a bare call: under `set -e` a non-zero exit
+# would abort here, skipping the cleanup below and leaking the temp directory.
+VALIDATOR_EXIT=0
+bash "$VALIDATOR" "$OUTPUT_DIR" || VALIDATOR_EXIT=$?
 
 echo ""
 echo "=== Cleaning up ==="
