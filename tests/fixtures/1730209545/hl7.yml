@@ -1,0 +1,96 @@
+allergy:
+  types:
+  - DA
+  - FA
+  - MA
+  - MC
+  severities:
+  - SV
+  - MO
+  - MI
+  coding_system: SNM3
+diagnosis:
+  types:
+  - A
+  - W
+  - F
+  coding_system: SNM3
+document:
+  types:
+  - AR
+  - CD
+  - CN
+  - DI
+  - DS
+  - ED
+  - HP
+  - OP
+  - PC
+  - PH
+  - PN
+  - SP
+  - TS
+procedure:
+  types:
+  - A
+  - P
+  - I
+  - D
+  coding_system: SNM3
+order_control:
+  new: NW
+  ok: OK
+  with_observations: RE
+result_status:
+  final: F
+  corrected: C
+document_status:
+  authenticated: AU
+order_status:
+  completed: CM
+  in_process: IP
+patient_class:
+  outpatient: O
+  inpatient: I
+patient_account_status:
+  arrived: ARRIVED
+  cancelled: CANCELLED
+  finished: FINISHED
+  planned: PLANNED
+gender:
+  male: M
+  female: F
+abnormal_flags:
+  below_low_normal: L
+  above_high_normal: H
+primary_facility:
+  organization_name: COOK COUNTY
+  id_number: '1730209545'
+hospital_service: 282N00000X
+coding_system: WinPath
+mapping:
+  fhir:
+    coding_systems:
+      SNM3: https://snomed.info/sct
+    allergy_severities:
+      severe:
+      - SV
+      - SEVERE
+      moderate:
+      - MO
+      - MODERATE
+      mild:
+      - MI
+      - MILD
+    allergy_types:
+      food:
+      - FA
+      - FOOD
+      medication:
+      - DA
+      - MEDICATION
+      environment:
+      - EA
+      - ENVIRONMENTAL
+      biologic:
+      - BIOLOGIC
