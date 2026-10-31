@@ -47,6 +47,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
       - name: Run simulator validation
-        env:
-          SIMULATOR_VALIDATION: "true"
+        # Deliberately does NOT set SIMULATOR_VALIDATION. The GCR image this job
+        # used to pull (eu.gcr.io/simhospital-images/simhospital:latest) is no
+        # longer publicly available and the job builds no binary, so there is
+        # nothing to run here. Setting the variable would turn "cannot validate"
+        # into a hard job failure; leaving it unset makes the script emit a
+        # ::warning annotation and exit 0. `make validate-simulator` still sets it,
+        # so a local run with no simulator available fails loudly instead.
         run: make validate-simulator

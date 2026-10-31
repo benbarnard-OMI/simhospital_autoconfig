@@ -142,6 +142,30 @@ leaks its temp directory on failure (a bare call under `set -e` aborted before c
 HL7 message content — the simulator writes to an HL7 sink, not stdout, so nothing asserts on
 generated messages.
 
+**Update — the Docker path is dead and never validated anything.** Verified after the push:
+`docker manifest inspect eu.gcr.io/simhospital-images/simhospital:latest` is denied
+(`eu.gcr.io` moved to Artifact Registry and rejects unauthenticated pulls), so the image the CI
+job falls back to cannot be fetched. Worse, that branch passes **none** of the `--*_file` flags —
+it mounts the config directory at `/configs/hl7_messages` and runs the image's default
+`health/simulator` entrypoint, so Simhospital would not have read the generated files even with a
+working image. An earlier note in this document guessed the mount shadowed `configs/hardcoded_messages`;
+that was wrong, and the real defect is that the invocation never points at the configs.
+
+Consequence: removing `continue-on-error` (correct in itself) would have made the CI job fail
+outright, since it has no binary and no pullable image. Resolution — CI no longer sets
+`SIMULATOR_VALIDATION`, so an absent simulator emits a `::warning` annotation and exits 0, while
+`make validate-simulator` still sets it and therefore still fails loudly for a developer who
+explicitly asked to validate. All three branches were measured, not assumed:
+
+```
+no simulator, env unset   -> ::warning annotation, exit 0     (CI)
+no simulator, env=true    -> exit 1                           (local make)
+local binary present      -> loads 3 locations, exit 0        (verified)
+```
+
+Real simulator validation therefore happens **locally only**, against `simhospital/simulator`.
+Making it run in CI would require building the Go binary there.
+
 ---
 
 ## Test results

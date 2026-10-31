@@ -61,6 +61,13 @@ if [ -n "$LOCAL_BINARY" ]; then
     echo "Simulator completed successfully."
     exit 0
 elif command -v docker >/dev/null 2>&1; then
+    # NOTE: this branch is unverified and does not validate the generated configs.
+    # The image eu.gcr.io/simhospital-images/simhospital:latest is no longer publicly
+    # pullable (eu.gcr.io moved to Artifact Registry and denies unauthenticated
+    # requests), and the invocation passes none of the --*_file flags: it mounts the
+    # config directory at /configs/hl7_messages and runs the image's default
+    # health/simulator entrypoint, so Simhospital never reads the files under test.
+    # Left in place but no longer allowed to claim success silently.
     echo "Docker found. Running simulator in Docker..."
     CONFIG_ABS="$(cd "$CONFIG_DIR" && pwd)"
     "${TIMEOUT_CMD[@]}" docker run --rm \
@@ -72,23 +79,29 @@ elif command -v docker >/dev/null 2>&1; then
             exit 0
         fi
         echo "ERROR: Docker simulator exited with code $EXIT_CODE"
-        echo "NOTE: The image eu.gcr.io/simhospital-images/simhospital:latest may require authentication."
-        echo "      Run: gcloud auth configure-docker eu.gcr.io"
+        echo "NOTE: The image eu.gcr.io/simhospital-images/simhospital:latest may require authentication,"
+        echo "      or may no longer be published. Run: gcloud auth configure-docker eu.gcr.io"
         exit $EXIT_CODE
     }
-    echo "Simulator completed successfully."
+    echo "::warning title=Simulator validation inconclusive::The Docker path does not pass the generated config files to the simulator, so this run did not validate them. Build a local binary instead: cd simhospital && go build -o simulator ./cmd/simulator"
+    echo "Container exited 0, but the generated configs were never passed to it."
     exit 0
 else
     echo "ERROR: Neither Docker nor a local simulator binary was found."
     echo "Looked for: $PROJECT_ROOT/simulator, $PROJECT_ROOT/simhospital/simulator, ./simulator, and docker on PATH."
     if [ "${SIMULATOR_VALIDATION:-}" = "true" ]; then
-        # CI sets SIMULATOR_VALIDATION. Exiting 0 here let the job report success
-        # without ever starting the simulator, which is worse than failing.
+        # Set by `make validate-simulator`: a developer who explicitly asks to
+        # validate should not get a green run when nothing was validated.
         echo "SIMULATOR_VALIDATION=true, so a skipped validation is treated as a failure."
         exit 1
     fi
-    echo "Set SIMULATOR_VALIDATION=true to make this fatal. To enable it locally either"
-    echo "install Docker, or build the binary:"
+    # This is not a validation failure -- no simulator ever looked at the configs --
+    # so it must not exit non-zero. It must not pass silently either, which is what a
+    # bare echo plus exit 0 used to do. The annotation surfaces it in the Actions UI.
+    SKIP_MSG="Simulator validation SKIPPED: no simulator available (no local binary, no docker). Configs were generated but never checked against Simhospital."
+    echo "WARNING: $SKIP_MSG"
+    echo "::warning title=Simulator validation skipped::$SKIP_MSG"
+    echo "To enable it, either install Docker or build the binary:"
     echo "  cd simhospital && go build -o simulator ./cmd/simulator"
     exit 0
 fi
