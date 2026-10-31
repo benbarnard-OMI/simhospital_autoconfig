@@ -4,8 +4,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 NPI="${1:-1730209545}"
-OUTPUT_DIR="${2:-$PROJECT_ROOT/tmp-config-$NPI}"
+if [ "$#" -ge 2 ]; then
+    OUTPUT_DIR="$2"
+    CLEANUP_OUTPUT=false
+else
+    OUTPUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/simhospital-config-${NPI}.XXXXXX")"
+    CLEANUP_OUTPUT=true
+fi
 VALIDATOR="$SCRIPT_DIR/validate_with_simulator.sh"
+
+if [ "$CLEANUP_OUTPUT" = true ]; then
+    trap 'rm -rf -- "$OUTPUT_DIR"' EXIT
+fi
 
 echo "=== Generating configs for NPI $NPI ==="
 cd "$PROJECT_ROOT"
@@ -30,7 +40,10 @@ VALIDATOR_EXIT=0
 bash "$VALIDATOR" "$OUTPUT_DIR" || VALIDATOR_EXIT=$?
 
 echo ""
-echo "=== Cleaning up ==="
-rm -rf "$OUTPUT_DIR"
+if [ "$CLEANUP_OUTPUT" = true ]; then
+    echo "=== Cleaning up temporary output ==="
+else
+    echo "Keeping caller-provided output directory: $OUTPUT_DIR"
+fi
 
 exit $VALIDATOR_EXIT

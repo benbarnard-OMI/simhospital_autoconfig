@@ -112,21 +112,34 @@ make validate-simulator
 
 This command:
 1. Generates configs for the canonical test hospital (NPI `1730209545` — Cook County/Stroger Hospital).
-2. Runs the Simhospital Docker image against the generated configs.
+2. Starts the local Simhospital binary and confirms it loads the generated configs.
 3. Cleans up temporary files.
 
 Prerequisites:
-- Docker installed and running locally, **or** a built simulator binary at `simhospital/simulator` (`cd simhospital && go build -o simulator ./cmd/simulator`). The vendored `simhospital/` checkout is also required as `--local_path`, since the simulator resolves its own `configs/hardcoded_messages` and `configs/pathways` relative to it.
-- Network access to pull `eu.gcr.io/simhospital-images/simhospital:latest` when using Docker.
+- A Simhospital checkout at `simhospital/` and a built binary at `simhospital/simulator`. The checkout is required as `--local_path`, since the simulator resolves its own `configs/hardcoded_messages` and `configs/pathways` relative to it. Build the simulator with Bazel 5.4.1:
 
-If neither Docker nor a local binary is available, the script exits non-zero when
-`SIMULATOR_VALIDATION=true` (which CI and the Makefile set) and exits 0 with a warning
-otherwise. It used to exit 0 unconditionally, which let CI report success without ever
-starting the simulator.
+  ```bash
+  cd simhospital
+  echo 5.4.1 > .bazelversion
+  bazel build //cmd/simulator:simulator
+  simulator_target="$(bazel cquery --output=files //cmd/simulator:simulator | head -n 1)"
+  cp "$(readlink -f "$simulator_target")" simulator
+  cd ..
+  ```
 
-Note that this validates **config acceptance**: the simulator parses the generated files,
-loads the locations and doctors, and runs pathways. It does not assert on HL7 message content,
-which the simulator writes to an HL7 sink rather than stdout.
+If the binary is missing, the script exits non-zero. Timeouts and simulator errors also
+fail validation; a timeout does not prove that the configs were accepted. The CI job
+checks out a pinned Simhospital revision, builds the binary, and validates generated
+configs with it.
+
+This validates **config acceptance**: the simulator parses the generated files and loads the
+locations and doctors. The wrapper then stops it intentionally after startup, before waiting
+for a pathway to finish. It does not assert on HL7 message content, which the simulator writes
+to an HL7 sink rather than stdout. A startup timeout or early simulator exit is a failure.
+
+By default, the wrapper uses a unique temporary output directory and removes it on exit.
+If you pass an output directory as the second argument, that directory is retained for
+inspection after validation.
 
 ## Data Sources
 
