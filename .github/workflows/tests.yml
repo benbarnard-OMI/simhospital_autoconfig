@@ -43,6 +43,18 @@ jobs:
           path: simhospital
       - name: Pin Simhospital Bazel version
         run: echo 5.4.1 > simhospital/.bazelversion
+      - name: Declare Simhospital's missing logrus dependency
+        run: |
+          cat >> simhospital/WORKSPACE <<'EOF'
+
+          # logrus v1.4.2 imports x/sys/unix on Linux, but this dependency is
+          # missing from the pinned revision's WORKSPACE.
+          go_repository(
+              name = "org_golang_x_sys",
+              importpath = "golang.org/x/sys",
+              version = "v0.0.0-20200930185726-fdedc70b468f",
+          )
+          EOF
       - name: Set up Bazel
         uses: bazel-contrib/setup-bazel@0.19.1
         with:
