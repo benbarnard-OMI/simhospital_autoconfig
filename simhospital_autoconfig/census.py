@@ -15,72 +15,63 @@ import requests
 CENSUS_API_BASE = "https://api.census.gov/data"
 logger = logging.getLogger(__name__)
 
+# ACS table B03002, "Hispanic or Latino Origin by Race".
+# Variable -> HL7 v2 Table 0005 / CDC race-ethnicity code.
+#
+# Labels verified against https://api.census.gov/data/2023/acs/acs5/groups/B03002.json.
+# B03002_002E is the *not*-Hispanic total and B03002_012E is the Hispanic total; the
+# previous mapping had these inverted and misassigned every other variable, which would
+# have reported a ~93% non-Hispanic ZCTA as ~93% Hispanic.
+#
+# These eight variables partition B03002_001E (total population) exactly: 012 is the
+# Hispanic-or-Latino total, 003-009 are the not-Hispanic race categories. 008 and 009
+# both map to 2131-1 ("other"), so counts are summed per code, not overwritten.
+#
+# Codes are the dashed CDC/HL7 form rather than the single letters A-Z used by the
+# upstream UK ethnicity.csv, so US-derived rows cannot collide with those CE IDs.
 RACE_ETHNICITY_MAP = {
-    "B03002_002E": "H",
-    "B03002_008E": "W",
-    "B03002_009E": "B",
-    "B03002_011E": "A",
-    "B03002_005E": "HL",
-    "B03002_004E": "HP",
-    "B03002_003E": "HM",
-    "B03002_010E": "AI",
-    "B03002_012E": "NH",
-    "B03002_006E": "HO",
-    "B03002_013E": "SR",
-    "B03002_014E": "TM",
+    "B03002_012E": "2135-2",  # Hispanic or Latino
+    "B03002_003E": "2106-3",  # White alone, not Hispanic
+    "B03002_004E": "2054-5",  # Black or African American alone, not Hispanic
+    "B03002_005E": "1002-5",  # American Indian and Alaska Native alone, not Hispanic
+    "B03002_006E": "2028-9",  # Asian alone, not Hispanic
+    "B03002_007E": "2076-8",  # Native Hawaiian and Other Pacific Islander alone, not Hispanic
+    "B03002_008E": "2131-1",  # Some other race alone, not Hispanic
+    "B03002_009E": "2131-1",  # Two or more races, not Hispanic
 }
 
-SEX_AGE_VARIABLES = [
-    "B01001_001E",
-    "B01001_002E",
-    "B01001_003E",
-    "B01001_004E",
-    "B01001_005E",
-    "B01001_006E",
-    "B01001_007E",
-    "B01001_008E",
-    "B01001_009E",
-    "B01001_010E",
-    "B01001_011E",
-    "B01001_012E",
-    "B01001_013E",
-    "B01001_014E",
-    "B01001_015E",
-    "B01001_016E",
-    "B01001_017E",
-    "B01001_018E",
-    "B01001_019E",
-    "B01001_020E",
-    "B01001_021E",
-    "B01001_022E",
-    "B01001_023E",
-    "B01001_024E",
-    "B01001_025E",
-    "B01001_026E",
-    "B01001_027E",
-    "B01001_028E",
-    "B01001_029E",
-    "B01001_030E",
-    "B01001_031E",
-    "B01001_032E",
-    "B01001_033E",
-    "B01001_034E",
-    "B01001_035E",
-    "B01001_036E",
-    "B01001_037E",
-    "B01001_038E",
-    "B01001_039E",
-    "B01001_040E",
-    "B01001_041E",
-    "B01001_042E",
-    "B01001_043E",
-    "B01001_044E",
-    "B01001_045E",
-    "B01001_046E",
-    "B01001_047E",
-    "B01001_048E",
-    "B01001_049E",
-]
+ETHNICITY_LABELS = {
+    "2135-2": "Hispanic or Latino",
+    "2106-3": "White",
+    "2054-5": "Black or African American",
+    "1002-5": "American Indian or Alaska Native",
+    "2028-9": "Asian",
+    "2076-8": "Native Hawaiian or Other Pacific Islander",
+    "2131-1": "Some other race or two or more races",
+}
+
+# Most recent ACS 5-year release verified to serve ZCTA data as of 2026-10.
+DEFAULT_ACS_YEAR = 2023
+
+# B01001_001E is the only sex-by-age variable any generator consumes (total
+# population). The full 49-variable age breakdown was fetched but never read, and
+# requesting it alongside B03002 exceeded the Census API's 50-variable cap per
+# request, which made every call fail with HTTP 400.
+TOTAL_POPULATION_VARIABLE = "B01001_001E"
+
+
+def _as_count(value: Any) -> int:
+    """Coerce an ACS estimate to a non-negative int.
+
+    ACS uses large negative sentinels (e.g. -666666666) for estimates that are not
+    available, and a missing variable comes back as None. Either would otherwise
+    produce a negative or crashing frequency downstream.
+    """
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return parsed if parsed > 0 else 0
 
 
 class CensusClient:
@@ -113,51 +104,61 @@ class CensusClient:
                     time.sleep(wait)
         raise last_exception  # type: ignore[misc]
 
-    def _build_acs_url(self, year: int = 2021) -> str:
+    def _build_acs_url(self, year: int = DEFAULT_ACS_YEAR) -> str:
         return f"{CENSUS_API_BASE}/{year}/acs/acs5"
 
-    def get_demographics(self, zcta: str) -> dict[str, Any]:
+    def get_demographics(self, zcta: str, year: int = DEFAULT_ACS_YEAR) -> dict[str, Any]:
         """
         Fetch demographics for a ZIP Code Tabulation Area.
 
         Args:
-            zcta: ZIP Code Tabulation Area (e.g., "60601")
+            zcta: ZIP Code Tabulation Area (e.g., "60612")
+            year: ACS 5-year release to query
 
         Returns:
-            Dictionary with total population, ethnicity counts, and sex/age counts
+            Dictionary with total_population, ethnicity (HL7/CDC code -> count),
+            ethnicity_labels (code -> label), zcta and acs_year.
 
         Raises:
-            ValueError: If the API key is required but missing
+            ValueError: If no API key is configured, or the API returns no row
+                for the given ZCTA.
         """
         if not self.api_key:
-            logger.warning("Census API key not set. Requests may be throttled.")
+            # Without a key api.census.gov answers with an HTTP 200 HTML "Missing Key"
+            # page. That previously surfaced as an opaque JSON decode error after three
+            # retries, and the caller's broad except turned it into a silent fallback to
+            # UK default demographics.
+            raise ValueError(
+                "CENSUS_API_KEY is not set. api.census.gov requires a key and returns an "
+                "HTML 'Missing Key' page without one. Get a free key at "
+                "https://api.census.gov/data/key_signup.html and add it to .env."
+            )
 
-        url = self._build_acs_url()
+        url = self._build_acs_url(year)
         params = {
-            "get": ",".join(["NAME"] + SEX_AGE_VARIABLES),
+            # B03002 must be requested explicitly; reading it from a response that only
+            # asked for B01001 silently yielded zeros for every ethnicity count.
+            "get": ",".join(["NAME", *RACE_ETHNICITY_MAP, TOTAL_POPULATION_VARIABLE]),
             "for": f"zip code tabulation area:{zcta}",
-            "key": self.api_key or "",
+            "key": self.api_key,
         }
 
         data = self._request(url, params)
         if not data or len(data) < 2:
             raise ValueError(f"No Census data returned for ZCTA: {zcta}")
 
-        headers = data[0]
-        values = data[1]
+        headers, values = data[0], data[1]
         row = dict(zip(headers, values))
 
         ethnicity: dict[str, int] = {}
         for var, code in RACE_ETHNICITY_MAP.items():
-            ethnicity[code] = int(row.get(var, 0))
-
-        sex_by_age: dict[str, int] = {}
-        for var in SEX_AGE_VARIABLES:
-            sex_by_age[var] = int(row.get(var, 0))
+            # B03002_008E and _009E share code 2131-1, so accumulate rather than overwrite.
+            ethnicity[code] = ethnicity.get(code, 0) + _as_count(row.get(var))
 
         return {
-            "total_population": int(row.get("B01001_001E", 0)),
+            "total_population": _as_count(row.get(TOTAL_POPULATION_VARIABLE)),
             "ethnicity": ethnicity,
-            "sex_by_age": sex_by_age,
+            "ethnicity_labels": dict(ETHNICITY_LABELS),
             "zcta": zcta,
+            "acs_year": year,
         }
