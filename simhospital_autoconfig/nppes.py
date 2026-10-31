@@ -66,6 +66,28 @@ class NPPESResult:
     raw_response: dict[str, Any] | None = None
 
 
+@dataclass
+class NPPESearchResults:
+    """Outcome of an organization name search.
+
+    ``total`` is the API's reported result_count, which can exceed ``len(results)``
+    when the search matched more organizations than one page holds. Callers need
+    that distinction: a single exact match among a truncated page is not the same
+    as a single match overall.
+    """
+
+    results: list[NPPESResult]
+    total: int = 0
+
+    @property
+    def truncated(self) -> bool:
+        return self.total > len(self.results)
+
+
+# NPPES caps a single response; ask for the maximum so an exact match is not missed.
+DEFAULT_SEARCH_LIMIT = 200
+
+
 class NPPESClient:
     """Client for interacting with the NPPES Registry API."""
 
@@ -128,12 +150,25 @@ class NPPESClient:
         if not data.get("result_count") or data.get("result_count") == 0:
             raise ValueError(f"No NPPES result found for NPI: {npi}")
 
-        result = data.get("results", [{}])[0]
-        org_name = result.get("basic", {}).get("organization_name")
+        return self._parse_organization(data.get("results", [{}])[0], npi=npi)
+
+    def _parse_organization(
+        self, result: dict[str, Any], npi: str | None = None
+    ) -> NPPESResult:
+        """Parse one NPPES result into an NPPESResult.
+
+        Shared by the NPI lookup and the name search so both interpret addresses,
+        taxonomies and identifiers identically.
+        """
+        basic = result.get("basic", {})
+        org_name = basic.get("organization_name")
         other_names = result.get("other_names") or []
         if not org_name and other_names:
             org_name = other_names[0].get("organization_name")
 
+        # Prefer the LOCATION address: MAILING is frequently an administrative office
+        # in a different ZIP with a different population, which would send the Census
+        # lookup to the wrong ZCTA.
         address = None
         addresses = result.get("addresses") or []
         location_addr = next((a for a in addresses if a.get("address_purpose") == "LOCATION"), None)
@@ -142,9 +177,9 @@ class NPPESClient:
         elif addresses:
             address = self._parse_address(addresses[0])
 
-        nppes_result = NPPESResult(
-            npi=npi,
-            enumeration_type="NPI-2",
+        return NPPESResult(
+            npi=npi or result.get("number") or "",
+            enumeration_type=result.get("enumeration_type") or "NPI-2",
             organization_name=org_name,
             other_names=other_names if other_names else None,
             address=address,
@@ -152,7 +187,54 @@ class NPPESClient:
             identifiers=self._parse_identifiers(result.get("identifiers", [])),
             raw_response=result,
         )
-        return nppes_result
+
+    def search_organizations(
+        self,
+        organization_name: str,
+        state: str,
+        limit: int = DEFAULT_SEARCH_LIMIT,
+        version: str = "2.1",
+    ) -> NPPESearchResults:
+        """
+        Search NPPES for organizations by name and state.
+
+        The match is fuzzy: searching "Rush University Medical Center" also returns
+        "Department of Psychiatry at Rush", and a single facility can hold several
+        NPIs across campuses. Callers are expected to filter to exact name matches
+        and to refuse to guess when more than one remains.
+
+        Args:
+            organization_name: Full or partial legal business name
+            state: Two-letter state abbreviation
+            limit: Maximum results to return in one page
+            version: API version (default: 2.1)
+
+        Returns:
+            NPPESearchResults with the parsed page and the API's total match count
+        """
+        params = {
+            "organization_name": organization_name,
+            "state": state,
+            # Organizations only; NPI-1 would return individual practitioners.
+            "enumeration_type": "NPI-2",
+            "limit": limit,
+            "version": version,
+        }
+        data = self._request_with_backoff(params)
+        total = int(data.get("result_count") or 0)
+        results = [
+            self._parse_organization(result) for result in data.get("results", []) or []
+        ]
+        if total > len(results):
+            logger.warning(
+                "NPPES matched %d organizations for %r in %s but returned only %d; "
+                "an exact match may be missing. Narrow the search or use --npi.",
+                total,
+                organization_name,
+                state,
+                len(results),
+            )
+        return NPPESearchResults(results=results, total=total)
 
     def _parse_address(self, address_data: dict[str, Any]) -> NPPESAddress | None:
         """Parse address from NPPES response."""

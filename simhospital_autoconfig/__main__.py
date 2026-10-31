@@ -11,13 +11,22 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import sys
+from typing import Any
 
 from .census import CensusClient
-from .cms import COL_FACILITY_ID, CMSClient
+from .cms import (
+    COL_EMERGENCY,
+    COL_FACILITY_ID,
+    COL_FACILITY_NAME,
+    COL_HOSPITAL_TYPE,
+    CMSClient,
+    normalize_name,
+)
 from .deterministic_checks import format_check_report, run_deterministic_checks
 from .generators import generate_all_configs
-from .nppes import NPPESClient, NPPESResult
+from .nppes import NPPESAddress, NPPESClient, NPPESResult
 
 logging.basicConfig(
     level=logging.INFO,
@@ -141,6 +150,216 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+MAX_LISTED_CANDIDATES = 10
+
+
+def _exact_name_matches(results: list[NPPESResult], name: str) -> list[NPPESResult]:
+    """Keep only results whose organization name matches exactly once normalized.
+
+    NPPES name search is fuzzy -- "Rush University Medical Center" also returns
+    "Department of Psychiatry at Rush" -- so fuzzy hits are dropped before deciding
+    whether the match is unambiguous.
+    """
+    wanted = normalize_name(name)
+    return [r for r in results if normalize_name(r.organization_name or "") == wanted]
+
+
+def _log_nppes_candidates(
+    candidates: list[NPPESResult], name: str, state: str, reason: str
+) -> None:
+    """List ambiguous NPPES matches so the user can pick an NPI."""
+    logger.error(
+        "%d NPPES organization(s) %s %r in %s:", len(candidates), reason, name, state
+    )
+    for result in candidates[:MAX_LISTED_CANDIDATES]:
+        address = result.address
+        if address and address.postal_code:
+            where = f"{address.city}, {address.state} {address.postal_code[:5]}"
+        else:
+            where = "no address on record"
+        logger.error("  NPI %s  %s  (%s)", result.npi, result.organization_name, where)
+    if len(candidates) > MAX_LISTED_CANDIDATES:
+        logger.error("  ... and %d more", len(candidates) - MAX_LISTED_CANDIDATES)
+    logger.error("Re-run with --npi <NPI> to select one; this tool will not guess.")
+
+
+def _resolve_by_name(
+    nppes_client: NPPESClient, name: str, state: str
+) -> tuple[NPPESResult | None, int]:
+    """Resolve --name/--state to a single NPPES organization.
+
+    Returns (result, exit_code); a non-zero exit_code means the caller should stop.
+    """
+    if not re.fullmatch(r"[A-Za-z]{2}", state.strip()):
+        logger.error("--state must be a two-letter abbreviation, got %r", state)
+        return None, 1
+
+    logger.info("Searching NPPES for %r in %s", name, state.upper())
+    try:
+        found = nppes_client.search_organizations(name, state.strip().upper())
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error("NPPES search failed: %s", exc)
+        return None, 1
+
+    if not found.results:
+        logger.error(
+            "NPPES has no organization matching %r in %s. NPPES records the legal "
+            "business name, which is often not the hospital's public name -- John H. "
+            "Stroger Jr. Hospital is registered as 'COOK COUNTY'. Try the legal entity, "
+            "or use --npi.",
+            name,
+            state,
+        )
+        return None, 1
+
+    exact = _exact_name_matches(found.results, name)
+    if len(exact) == 1:
+        chosen = exact[0]
+        logger.info("Resolved to NPI %s (%s)", chosen.npi, chosen.organization_name)
+        return chosen, 0
+
+    if len(exact) > 1:
+        _log_nppes_candidates(exact, name, state, "match exactly")
+        return None, 1
+
+    _log_nppes_candidates(found.results, name, state, "partially match")
+    return None, 1
+
+
+def _synthesize_from_cms(hospital: dict[str, Any]) -> NPPESResult:
+    """Build an NPPESResult from a mapped CMS record when NPPES has no match.
+
+    The CMS Facility ID (a CCN) stands in for the NPI and therefore ends up in
+    hl7.yml's id_number; the caller logs that. There are no taxonomies, so
+    hospital_service falls back to MED rather than claiming a specialty.
+    """
+    address = hospital.get("address") or {}
+    return NPPESResult(
+        npi=str(hospital.get("ccn") or ""),
+        enumeration_type="NPI-2",
+        organization_name=hospital.get("hospital_name"),
+        address=NPPESAddress(
+            address_1=address.get("street"),
+            city=address.get("city"),
+            state=address.get("state"),
+            postal_code=address.get("postal_code"),
+            country_code="US",
+            address_purpose="LOCATION",
+        ),
+        taxonomies=None,
+        identifiers=None,
+        raw_response=None,
+    )
+
+
+def _resolve_by_zip(
+    cms_client: CMSClient, nppes_client: NPPESClient, args: argparse.Namespace
+) -> tuple[NPPESResult | None, dict[str, Any] | None, int]:
+    """Resolve --zip to one CMS facility, optionally narrowed by --name/--state.
+
+    Returns (nppes_result, hospital_data, exit_code). hospital_data comes back
+    already mapped so the shared tail does not repeat the catalog join.
+
+    ZIP goes through CMS rather than NPPES because NPPES has no facility-type
+    filter: postal_code + NPI-2 returns every organization in the ZIP, including
+    therapy practices and transport companies.
+    """
+    zip_code = (args.zip or "").strip()
+    # Hyphen required for ZIP+4: accepting "606123456" would silently truncate a
+    # nine-digit typo to a valid-looking ZIP.
+    if not re.fullmatch(r"\d{5}(-\d{4})?", zip_code):
+        logger.error("--zip must be a 5-digit ZIP code, optionally ZIP+4, got %r", args.zip)
+        return None, None, 1
+    zip_code = zip_code[:5]
+
+    logger.info("Looking up CMS hospitals in ZIP %s", zip_code)
+    try:
+        rows = cms_client.search_hospitals(
+            name=args.name, state=args.state, zip_code=zip_code
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error("CMS lookup failed: %s", exc)
+        return None, None, 1
+
+    if not rows:
+        logger.error(
+            "The CMS catalog has no hospital in ZIP %s%s. Narrow or drop the --name "
+            "filter, or use --npi.",
+            zip_code,
+            f" matching {args.name!r}" if args.name else "",
+        )
+        return None, None, 1
+
+    if len(rows) > 1:
+        logger.error("%d CMS facilities are in ZIP %s:", len(rows), zip_code)
+        for row in rows[:MAX_LISTED_CANDIDATES]:
+            logger.error(
+                "  CCN %s  %s  (%s, ED: %s)",
+                row.get(COL_FACILITY_ID),
+                row.get(COL_FACILITY_NAME),
+                row.get(COL_HOSPITAL_TYPE),
+                row.get(COL_EMERGENCY),
+            )
+        if len(rows) > MAX_LISTED_CANDIDATES:
+            logger.error("  ... and %d more", len(rows) - MAX_LISTED_CANDIDATES)
+        logger.error(
+            "Narrow it with --name, or re-run with --npi <NPI>; this tool will not guess."
+        )
+        return None, None, 1
+
+    hospital_data = cms_client.map_to_simhospital_config(rows[0])
+    logger.info(
+        "Resolved ZIP %s to %s (CCN %s)",
+        zip_code,
+        hospital_data.get("hospital_name"),
+        hospital_data.get("ccn"),
+    )
+
+    # Prefer a real NPPES record: it carries taxonomies, which decide hospital_service.
+    state = (hospital_data.get("address") or {}).get("state")
+    name = hospital_data.get("hospital_name")
+    exact: list[NPPESResult] = []
+    if name and state:
+        try:
+            exact = _exact_name_matches(
+                nppes_client.search_organizations(name, state).results, name
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("NPPES search failed (%s); using the CMS record alone", exc)
+
+    if len(exact) == 1:
+        logger.info(
+            "Joined to NPPES NPI %s; its taxonomies will drive hospital_service",
+            exact[0].npi,
+        )
+        return exact[0], hospital_data, 0
+
+    # Both fallbacks below use the CMS record alone, but they must not share a
+    # message: "ambiguous" and "absent" tell the user to do different things.
+    if len(exact) > 1:
+        logger.warning(
+            "%d NPPES organizations share the exact name %r in %s, so the join is "
+            "ambiguous and this tool will not guess. Using the CMS record alone: "
+            "hl7.yml id_number will be CCN %s and hospital_service will default to "
+            "MED. Re-run with --npi <NPI> to pick up the real taxonomies.",
+            len(exact),
+            name,
+            state,
+            hospital_data.get("ccn"),
+        )
+        return _synthesize_from_cms(hospital_data), hospital_data, 0
+
+    logger.warning(
+        "No NPPES organization is registered as %r -- NPPES often records the legal "
+        "entity instead (John H. Stroger Jr. Hospital is 'COOK COUNTY'). Falling back "
+        "to the CMS record: hl7.yml id_number will be CCN %s and hospital_service will "
+        "default to MED.",
+        name,
+        hospital_data.get("ccn"),
+    )
+    return _synthesize_from_cms(hospital_data), hospital_data, 0
+
+
 def run_generate(args: argparse.Namespace) -> int:
     """Execute the generate command."""
     if args.verbose:
@@ -150,11 +369,16 @@ def run_generate(args: argparse.Namespace) -> int:
     cms_client = CMSClient()
     census_client = CensusClient()
 
-    nppes_result = None
-    hospital_data = None
+    nppes_result: NPPESResult | None = None
+    # Pre-populated when --zip already resolved the facility in the CMS catalog, so
+    # the shared tail below does not have to join it a second time.
+    hospital_data: dict | None = None
     demographics = None
     doctors: list[dict] = []
 
+    # --zip is tested before --name/--state so that --zip can be narrowed by them:
+    # search_hospitals accepts all three filters, and a dense ZIP such as 60612 holds
+    # four separate hospitals.
     if args.npi:
         logger.info("Fetching hospital by NPI: %s", args.npi)
         try:
@@ -163,31 +387,39 @@ def run_generate(args: argparse.Namespace) -> int:
         except Exception as exc:  # pylint: disable=broad-except
             logger.error("Failed to fetch NPPES data: %s", exc)
             return 1
-    elif args.name and args.state:
-        logger.info("Searching NPPES for %s in %s", args.name, args.state)
-        # For simplicity, this CLI path requires manual NPI lookup or future NPPES search implementation
-        logger.error("Name/state search not yet implemented; please use --npi")
-        return 1
     elif args.zip:
-        logger.info("Resolving ZIP %s to ZCTA and fetching CMS hospital", args.zip)
-        # CMS does not directly support ZIP-to-CCN search in this client yet
-        logger.error("ZIP-based resolution not yet implemented; please use --npi")
-        return 1
+        nppes_result, hospital_data, exit_code = _resolve_by_zip(cms_client, nppes_client, args)
+        if exit_code:
+            return exit_code
+    elif args.name and args.state:
+        nppes_result, exit_code = _resolve_by_name(nppes_client, args.name, args.state)
+        if exit_code:
+            return exit_code
     else:
         logger.error("Must specify --npi, or --name with --state, or --zip")
         return 1
 
+    if nppes_result is None:
+        logger.error("Could not resolve a single hospital from the given arguments")
+        return 1
+
     if nppes_result:
-        logger.info("Fetching CMS data")
-        try:
-            hospital_data = _resolve_cms_hospital(cms_client, nppes_result)
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.warning(
-                "CMS lookup failed for %s (%s). locations.yml will use built-in "
-                "defaults instead of this hospital's real type and ED status.",
-                nppes_result.organization_name,
-                exc,
+        if hospital_data is not None:
+            logger.info(
+                "Reusing the CMS record resolved from --zip: %s",
+                hospital_data.get("hospital_name"),
             )
+        else:
+            logger.info("Fetching CMS data")
+            try:
+                hospital_data = _resolve_cms_hospital(cms_client, nppes_result)
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.warning(
+                    "CMS lookup failed for %s (%s). locations.yml will use built-in "
+                    "defaults instead of this hospital's real type and ED status.",
+                    nppes_result.organization_name,
+                    exc,
+                )
 
         logger.info("Fetching Census demographics")
         try:

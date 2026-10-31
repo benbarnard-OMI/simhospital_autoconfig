@@ -55,8 +55,13 @@ COL_EMERGENCY = "Emergency Services"
 TRUTHY = {"yes", "y", "true"}
 
 
-def _normalize_name(name: str) -> str:
-    """Uppercase, strip punctuation and collapse whitespace for tolerant matching."""
+def normalize_name(name: str) -> str:
+    """Uppercase, strip punctuation and collapse whitespace for tolerant matching.
+
+    Public because NPPES and CMS punctuate and capitalize facility names
+    differently, and both the catalog filter and the CLI's exact-match check need
+    the same folding to compare them.
+    """
     return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9 ]", "", (name or "").upper())).strip()
 
 
@@ -157,7 +162,7 @@ class CMSClient:
         """
         state_up = (state or "").strip().upper()
         zip_digits = (zip_code or "")[:5]
-        needle = _normalize_name(name) if name else None
+        needle = normalize_name(name) if name else None
 
         matches = []
         for row in self.load_rows():
@@ -166,7 +171,7 @@ class CMSClient:
             if zip_digits and (row.get(COL_ZIP) or "").strip()[:5] != zip_digits:
                 continue
             if needle:
-                haystack = _normalize_name(row.get(COL_FACILITY_NAME) or "")
+                haystack = normalize_name(row.get(COL_FACILITY_NAME) or "")
                 if needle != haystack and needle not in haystack:
                     continue
             matches.append(dict(row))
