@@ -3,6 +3,12 @@ import pytest
 
 import os
 
+ALLOWED_SPECIALTIES = {
+    "MED", "SUR", "URO", "PUL", "CAR",
+    "ANESTH", "EMER", "FAMP", "INTMED", "OBG", "PEDS", "PSY", "RAD", "TRAUM"
+}
+
+
 def test_doctors_yaml_structure():
     # Resolve the path relative to the test file to handle execution from other directories
     file_path = os.path.join(os.path.dirname(__file__), "doctors.yml")
@@ -28,3 +34,13 @@ def test_doctors_yaml_structure():
         doctor_id = doctor["id"]
         assert doctor_id not in seen_ids, f"Duplicate doctor id found: {doctor_id}"
         seen_ids.add(doctor_id)
+
+
+def test_doctors_specialty_codes():
+    file_path = os.path.join(os.path.dirname(__file__), "doctors.yml")
+    with open(file_path, "r") as f:
+        data = yaml.safe_load(f)
+
+    for doctor in data:
+        specialty = doctor["specialty"]
+        assert specialty in ALLOWED_SPECIALTIES, f"Doctor {doctor['id']} has invalid specialty: {specialty}"
