@@ -15,7 +15,9 @@ import yaml
 
 from .addresses import US_CITY_FALLBACK, US_STREET_SUFFIXES
 from .census import ETHNICITY_LABELS
+from .deterministic_checks import format_check_report, run_deterministic_checks
 from .nppes import NPPESAddress, NPPESResult
+from .specialties import DEFAULT_SPECIALTY, get_hl7_code
 
 logger = logging.getLogger(__name__)
 
@@ -710,6 +712,7 @@ def generate_all_configs(
     demographics: dict[str, Any] | None = None,
     hospital_data: dict[str, Any] | None = None,
     doctors: list[dict[str, Any]] | None = None,
+    validate: bool = True,
 ) -> dict[str, str]:
     """
     Generate all Simhospital configuration files from NPPES data.
@@ -720,16 +723,23 @@ def generate_all_configs(
         demographics: Optional Census demographics data
         hospital_data: Optional CMS hospital data
         doctors: Optional list of doctor records
+        validate: Run the deterministic checks over the written files and log the
+            report. Failures are logged, not raised, because a degraded data source
+            still produces usable configs; callers that need a hard gate should
+            inspect run_deterministic_checks(output_dir) themselves.
 
     Returns:
         Dictionary mapping filename to the generated content
     """
     org_name = nppes_result.organization_name or "Unknown Hospital"
     org_id = nppes_result.npi
-    hospital_service = "MED"
+    hospital_service = DEFAULT_SPECIALTY
     if nppes_result.taxonomies:
         primary = next((t for t in nppes_result.taxonomies if t.primary), nppes_result.taxonomies[0])
-        hospital_service = primary.code or hospital_service
+        # primary.code is a NUCC taxonomy code such as 282N00000X. hl7.yml's
+        # hospital_service is an HL7 Table 0069 value, so map from the description;
+        # writing the NUCC code through produced invalid HL7.
+        hospital_service = get_hl7_code(primary.desc)
 
     results: dict[str, str] = {}
 
@@ -767,5 +777,19 @@ def generate_all_configs(
             doctors,
             output_path=os.path.join(output_dir, "doctors.yml"),
         )
+
+    if validate:
+        # Validate what was actually written, not a checked-in fixture: the previous
+        # fixture-scoped checks reported confidence 1.0 on output that was still
+        # London ethnicity data with placeholder doctors.
+        report = run_deterministic_checks(output_dir)
+        if any(not passed for passed, _ in report.values()):
+            logger.warning(
+                "Generated configs in %s failed deterministic checks:\n%s",
+                output_dir,
+                format_check_report(report),
+            )
+        else:
+            logger.info("All %d deterministic checks passed for %s", len(report), output_dir)
 
     return results

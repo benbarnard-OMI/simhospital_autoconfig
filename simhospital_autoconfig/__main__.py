@@ -15,6 +15,7 @@ import sys
 
 from .census import CensusClient
 from .cms import COL_FACILITY_ID, CMSClient
+from .deterministic_checks import format_check_report, run_deterministic_checks
 from .generators import generate_all_configs
 from .nppes import NPPESClient, NPPESResult
 
@@ -132,6 +133,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable verbose logging",
     )
+    generate_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit non-zero if any deterministic check fails on the generated configs",
+    )
     return parser
 
 
@@ -241,8 +247,22 @@ def run_generate(args: argparse.Namespace) -> int:
         demographics=demographics,
         hospital_data=hospital_data,
         doctors=doctors if doctors else None,
+        # Reported once here rather than inside the generator, so the same results
+        # can drive the exit code under --strict.
+        validate=False,
     )
     logger.info("Successfully generated configuration files")
+
+    report = run_deterministic_checks(args.output_dir)
+    failures = [name for name, (passed, _) in report.items() if not passed]
+    if failures:
+        logger.warning("%s", format_check_report(report))
+        if args.strict:
+            logger.error("--strict set and %d deterministic checks failed", len(failures))
+            return 1
+    else:
+        logger.info("All %d deterministic checks passed", len(report))
+
     return 0
 
 

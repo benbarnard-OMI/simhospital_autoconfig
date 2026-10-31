@@ -85,12 +85,26 @@ address:
   cities:
   - CHICAGO
   streets:
-  - Road
   - Street
-  - Lane
   - Avenue
+  - Road
+  - Drive
+  - Lane
+  - Court
   - Place
+  - Terrace
+  - Circle
+  - Boulevard
+  - Parkway
+  - Way
+  - Trail
+  - Highway
   - Square
+  - Loop
+  - Crossing
+  - Run
+  - Path
+  - Ridge
   country: USA
   types:
   - HOME

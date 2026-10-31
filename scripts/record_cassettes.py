@@ -1,197 +1,183 @@
-"""Record vcrpy cassettes for NPI 1730209545 against the real NPPES, CMS, and Census APIs,
-then generate the corresponding Simhospital configuration files.
+"""Record vcrpy cassettes for a canonical NPI, then regenerate its config fixtures.
+
+NPPES and Census are recorded through vcr so tests can replay them offline. CMS is
+deliberately *not* recorded: the Provider Data Catalog has no working server-side
+filter, so the client downloads a 1.4 MB bulk CSV, which would dwarf everything else
+in the cassette. The resolved hospital record is persisted as JSON instead.
 
 Usage:
+    set -a; . ./.env; set +a          # loads CENSUS_API_KEY
     python3 scripts/record_cassettes.py
 """
 
+from __future__ import annotations
+
+import json
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any
 
 import requests
 import vcr
-import yaml
 
-from simhospital_autoconfig.census import CensusClient, CENSUS_API_BASE, RACE_ETHNICITY_MAP
+from simhospital_autoconfig.census import CensusClient
 from simhospital_autoconfig.cms import CMSClient
+from simhospital_autoconfig.deterministic_checks import (
+    format_check_report,
+    run_deterministic_checks,
+)
 from simhospital_autoconfig.generators import generate_all_configs
-from simhospital_autoconfig.nppes import NPPESClient, NPPES_API_BASE
+from simhospital_autoconfig.nppes import NPPESClient
 
-NPI = "1730209545"
-ZCTA = "60601"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+NPI = os.environ.get("FIXTURE_NPI", "1730209545")
 CASSETTE_NAME = f"test_simulator_validation[{NPI}]"
 CASSETTE_DIR = "tests/cassettes"
-OUTPUT_DIR = os.path.join("tests", "fixtures", NPI)
-LOG_LEVEL = logging.INFO
+OUTPUT_DIR = Path("tests") / "fixtures" / NPI
 
-logging.basicConfig(
-    level=LOG_LEVEL,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("record_cassettes")
 
 
-def _strip_census_key(request: Any) -> Any:
-    """Remove the Census API `key` parameter before the cassette is persisted."""
-    try:
-        from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-    except ImportError:
-        return request
+def _strip_secrets(request: Any) -> Any:
+    """Remove the Census API key from the URI before the cassette is persisted."""
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
     parts = urlsplit(request.uri)
-    pairs = parse_qsl(parts.query, keep_blank_values=True)
-    new_pairs = [(k, v) for (k, v) in pairs if k != "key"]
-    new_query = urlencode(new_pairs, doseq=True)
-    request.uri = urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
+    kept = [(k, v) for (k, v) in parse_qsl(parts.query, keep_blank_values=True) if k != "key"]
+    request.uri = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(kept), parts.fragment))
     return request
 
 
-def _record_cassette() -> Dict[str, Any]:
-    """Use vcrpy to record live HTTP interactions and return the parsed data."""
-    cassette_path = CASSETTE_NAME
-    fixtures: Dict[str, Any] = {}
+def _zcta_from_nppes(nppes_result: Any) -> str | None:
+    """Derive the ZCTA from the NPPES LOCATION address.
 
+    The LOCATION address is the facility; the MAILING address is often an
+    administrative office in a different ZCTA with a different population.
+    """
+    address = nppes_result.address
+    if address and address.postal_code:
+        return address.postal_code[:5]
+    return None
+
+
+def record() -> dict[str, Any]:
+    """Fetch NPPES and Census through vcr, and CMS live. Returns the generator inputs."""
     nppes = NPPESClient()
-    cms = CMSClient()
-    census = CensusClient(api_key=os.environ.get("CENSUS_API_KEY") or "")
+    recorded: dict[str, Any] = {}
 
-    nppes_vcr = vcr.VCR(
+    recorder = vcr.VCR(
         cassette_library_dir=CASSETTE_DIR,
         record_mode="once",
         path_transformer=vcr.VCR.ensure_suffix(".yaml"),
         filter_query_parameters=["key"],
-        before_record_request=_strip_census_key,
+        before_record_request=_strip_secrets,
     )
 
-    with nppes_vcr.use_cassette(cassette_path):
+    with recorder.use_cassette(CASSETTE_NAME):
         nppes_result = nppes.get_organization_by_npi(NPI)
-        fixtures["nppes"] = nppes_result
+        recorded["nppes"] = nppes_result
         logger.info("NPPES: %s", nppes_result.organization_name)
 
-        hospital_data = None
-        try:
-            hospital_data = cms.get_hospital_by_npi(NPI)
-            fixtures["cms"] = hospital_data
-            logger.info("CMS: %s", hospital_data.get("hospital_name") if hospital_data else None)
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.warning("CMS request failed (continuing): %s", exc)
-            hospital_data = None
+        zcta = _zcta_from_nppes(nppes_result)
+        logger.info("ZCTA from the LOCATION address: %s", zcta)
 
-        demographics: Optional[Dict[str, Any]] = None
-        try:
-            demographics = census.get_demographics(ZCTA)
-            fixtures["census"] = demographics
-            logger.info("Census demographics fetched.")
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.warning("Census request failed (likely no real key): %s", exc)
-            logger.warning("Recording an empty Census response so the cassette stays valid.")
-            census_url = f"{CENSUS_API_BASE}/2021/acs/acs5"
-            params = {
-                "get": ",".join(
-                    ["NAME", "B01001_001E"] + list(RACE_ETHNICITY_MAP.keys())
-                ),
-                "for": f"zip code tabulation area:{ZCTA}",
-                "key": os.environ.get("CENSUS_API_KEY", "") or "",
-            }
-            resp = requests.get(census_url, params=params, timeout=30)
+        demographics = None
+        if zcta:
             try:
-                payload: Any = resp.json()
-            except ValueError:
-                payload = {"error": resp.text}
-            fixtures["census_raw"] = payload
-            demographics = None
+                demographics = CensusClient().get_demographics(zcta)
+                logger.info(
+                    "Census: population %d across %d categories",
+                    demographics["total_population"],
+                    len(demographics["ethnicity"]),
+                )
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.error("Census fetch failed: %s", exc)
+        recorded["demographics"] = demographics
 
-    return {
-        "nppes": fixtures.get("nppes"),
-        "hospital_data": fixtures.get("cms"),
-        "demographics": fixtures.get("census"),
-        "census_raw": fixtures.get("census_raw"),
-    }
-
-
-def _build_demographics(raw: Any) -> Optional[Dict[str, Any]]:
-    """Convert raw Census two-row JSON into a demographics dict, if possible."""
-    if not raw or not isinstance(raw, list) or len(raw) < 2:
-        return None
-    headers = raw[0]
-    values = raw[1]
-    if not headers or not values:
-        return None
-    row = dict(zip(headers, values))
-
-    ethnicity: Dict[str, int] = {}
-    for var, code in RACE_ETHNICITY_MAP.items():
-        val = row.get(var, 0)
         try:
-            ethnicity[code] = int(val)
-        except (TypeError, ValueError):
-            ethnicity[code] = 0
+            doctors = nppes.fetch_doctors_by_location(zcta or "")
+            logger.info("NPPES practitioners: %d", len(doctors))
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error("Doctor fetch failed: %s", exc)
+            doctors = []
+        recorded["doctors"] = doctors
 
-    return {
-        "total_population": int(row.get("B01001_001E", 0) or 0),
-        "ethnicity": ethnicity,
-        "sex_by_age": {
-            var: int(row.get(var, 0) or 0)
-            for var in headers
-            if var.startswith("B01001_")
-        },
-        "zcta": row.get("zip code tabulation area", ZCTA),
-    }
+    # CMS is fetched outside the cassette; see the module docstring.
+    hospital_data = None
+    cms_json = OUTPUT_DIR / "cms_hospital.json"
+    if cms_json.exists():
+        hospital_data = json.loads(cms_json.read_text())
+        logger.info("CMS: reusing cached %s", cms_json)
+    else:
+        try:
+            from simhospital_autoconfig.__main__ import _resolve_cms_hospital
+
+            hospital_data = _resolve_cms_hospital(CMSClient(), nppes_result)
+            if hospital_data:
+                OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+                cms_json.write_text(json.dumps(hospital_data, indent=2) + "\n")
+                logger.info("CMS: %s", hospital_data.get("hospital_name"))
+            else:
+                logger.warning("CMS: no match; locations.yml will use built-in defaults")
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error("CMS lookup failed: %s", exc)
+    recorded["hospital_data"] = hospital_data
+
+    return recorded
 
 
-def _generate_configs(
-    nppes_result: Any,
-    hospital_data: Optional[Dict[str, Any]],
-    demographics: Optional[Dict[str, Any]],
-) -> List[str]:
-    """Run generate_all_configs and return the list of files written."""
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    results = generate_all_configs(
-        nppes_result,
-        output_dir=OUTPUT_DIR,
-        demographics=demographics,
-        hospital_data=hospital_data,
-    )
-    for filename, content in results.items():
-        path = os.path.join(OUTPUT_DIR, filename)
-        with open(path, "w") as fh:
-            fh.write(content)
-        logger.info("Wrote %s (%d bytes)", path, len(content))
-    return list(results.keys())
+def assert_cassette_has_no_secrets() -> None:
+    """Fail loudly if an API key was written into the cassette."""
+    path = Path(CASSETTE_DIR) / f"{CASSETTE_NAME}.yaml"
+    if not path.exists():
+        return
+    text = path.read_text(errors="replace")
+    leaked = [
+        name
+        for name in ("CENSUS_API_KEY", "TYPESAFE_API_KEY")
+        if (value := os.environ.get(name)) and value in text
+    ]
+    if leaked:
+        raise SystemExit(f"REFUSING TO CONTINUE: cassette contains secret(s): {leaked}")
+    if "key=" in text:
+        raise SystemExit("REFUSING TO CONTINUE: cassette still contains a 'key=' query parameter")
+    logger.info("Cassette verified free of secrets (%d bytes)", path.stat().st_size)
 
 
 def main() -> int:
-    os.makedirs(CASSETTE_DIR, exist_ok=True)
-    cassette_path = os.path.join(CASSETTE_DIR, f"{CASSETTE_NAME}.yaml")
+    Path(CASSETTE_DIR).mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    if os.path.exists(cassette_path):
-        logger.info("Cassette %s already exists; delete it to re-record.", cassette_path)
-    else:
-        logger.info("Recording cassette to %s ...", cassette_path)
+    if not os.environ.get("CENSUS_API_KEY"):
+        logger.warning(
+            "CENSUS_API_KEY is not set; ethnicity.csv will fall back to UK defaults. "
+            "Load it with: set -a; . ./.env; set +a"
+        )
 
-    recorded = _record_cassette()
+    recorded = record()
+    assert_cassette_has_no_secrets()
+
     nppes_result = recorded["nppes"]
-    hospital_data = recorded["hospital_data"]
-    demographics = recorded["demographics"]
+    results = generate_all_configs(
+        nppes_result,
+        output_dir=str(OUTPUT_DIR),
+        demographics=recorded["demographics"],
+        hospital_data=recorded["hospital_data"],
+        doctors=recorded["doctors"] or None,
+        validate=False,
+    )
+    for filename, content in results.items():
+        logger.info("Wrote %s (%d bytes)", OUTPUT_DIR / filename, len(content))
 
-    if demographics is None and recorded.get("census_raw") is not None:
-        demographics = _build_demographics(recorded["census_raw"])
-
-    if nppes_result is None:
-        logger.error("NPPES lookup failed; aborting.")
-        return 1
-
-    files = _generate_configs(nppes_result, hospital_data, demographics)
-    logger.info("Generated %d config files in %s", len(files), OUTPUT_DIR)
-
-    if os.path.exists(cassette_path):
-        size = os.path.getsize(cassette_path)
-        logger.info("Cassette ready: %s (%d bytes)", cassette_path, size)
-    else:
-        logger.warning("Cassette file not found at %s", cassette_path)
-
-    return 0
+    report = run_deterministic_checks(OUTPUT_DIR)
+    print()
+    print(format_check_report(report))
+    failures = [name for name, (passed, _) in report.items() if not passed]
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

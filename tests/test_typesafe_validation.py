@@ -187,7 +187,8 @@ class TestTypeSafeConfigAudit:
         - test_locations_yml.py updated for floor type compatibility
         - Simulator binary built and validated against generated configs
 
-        Test results: 46 passed, 0 skipped.
+        Test results: 82 passed and 7 skipped offline (89 collected); the 17
+        deterministic checks pass on the regenerated fixtures.
         """
         response = _run_questions(
             plan_text,
@@ -233,7 +234,7 @@ class TestTypeSafeConfigAudit:
                 "multiple taxonomies without primary handled",
                 "empty string NPI rejected",
             ],
-            "test_count": 46,
+            "test_count": 89,
             "edge_case_tests": [
                 "empty_demographics", "empty_doctors_list", "none_doctors",
                 "special_characters_in_name", "unicode_name", "long_name",
@@ -252,7 +253,7 @@ class TestTypeSafeConfigAudit:
             state,
             {
                 "needs_more_tests": Noul(
-                    instructions="Given the deterministic checks pass at high confidence and 46 edge case tests are implemented, does this project clearly need additional edge case tests before production?"
+                    instructions="Given the deterministic checks pass at high confidence and 27 edge case tests are implemented, does this project clearly need additional edge case tests before production?"
                 ),
                 "security_risk": Noul(
                     instructions="Is there a concrete security risk (injection, data exposure, hardcoded secrets) in the current implementation?"
