@@ -13,9 +13,19 @@ from typing import Any
 
 import yaml
 
+from .addresses import US_CITY_FALLBACK, US_STREET_SUFFIXES
+from .census import ETHNICITY_LABELS
 from .nppes import NPPESAddress, NPPESResult
 
 logger = logging.getLogger(__name__)
+
+# Weight of the "nil,nil" absent-ethnicity sentinel relative to ~1000 total. Kept at
+# the upstream file's value rather than inventing an unreported-rate figure; tune here
+# if a deployment wants more patients with no ethnicity recorded.
+NIL_ETHNICITY_FREQUENCY = 2
+
+# Target total for scaled Census frequencies, giving 0.1% resolution.
+ETHNICITY_FREQUENCY_TOTAL = 1000
 
 
 DEFAULT_HL7_YML = """\
@@ -518,17 +528,29 @@ def generate_data_yml(
     """
     data = yaml.safe_load(DEFAULT_DATA_YML)
 
-    if address:
-        if address.city:
-            data["address"]["cities"] = [address.city]
-        if address.postal_code:
-            data["address"]["postalcodes"] = [address.postal_code]
-        if address.country_code:
-            data["address"]["country"] = "USA" if address.country_code == "US" else address.country_code
+    country = "USA"
+    if address and address.country_code:
+        country = "USA" if address.country_code == "US" else address.country_code
+    data["address"]["country"] = country
+
+    if address and address.postal_code:
+        data["address"]["postalcodes"] = [address.postal_code]
+
+    if country == "USA":
+        # The upstream template ships UK address data (London post towns and
+        # Road/Street/Lane suffixes). A US hospital must not silently inherit it.
+        data["address"]["streets"] = list(US_STREET_SUFFIXES)
+        city = address.city if address else None
+        if city:
+            data["address"]["cities"] = [city]
         else:
-            data["address"]["country"] = "USA"
-    else:
-        data["address"]["country"] = "USA"
+            logger.warning(
+                "No city in the NPPES address for %s; falling back to generic US city "
+                "names. Generated patient addresses will not reflect the hospital's "
+                "actual location.",
+                organization_name,
+            )
+            data["address"]["cities"] = list(US_CITY_FALLBACK)
 
     if demographics:
         data.setdefault("allergy", {})
@@ -544,6 +566,18 @@ def generate_data_yml(
     return content
 
 
+def _scale_frequencies(counts: dict[str, int], target_total: int) -> dict[str, int]:
+    """Scale counts to sum to roughly target_total, keeping every row at least 1.
+
+    A frequency of 0 can never be sampled and breaks the positive-frequency invariant
+    the schema tests enforce, so a tiny category rounds up to 1 rather than down to 0.
+    """
+    total = sum(counts.values())
+    if total <= 0:
+        return {}
+    return {code: max(1, round(count * target_total / total)) for code, count in counts.items()}
+
+
 def generate_ethnicity_csv(
     organization_name: str,
     organization_id: str,
@@ -552,6 +586,13 @@ def generate_ethnicity_csv(
 ) -> str:
     """
     Generate ethnicity.csv configuration file.
+
+    When Census demographics are supplied they *replace* the upstream UK defaults
+    instead of being appended to them. The two share CE IDs -- the UK file uses single
+    letters A-Z including A, B and H -- so appending emitted duplicate IDs with
+    conflicting meanings (UK A = "White - British" alongside Census A = Asian).
+    Simhospital's loader accepts duplicates silently and just builds a weighted
+    distribution, so the corruption never surfaced as an error.
 
     Args:
         organization_name: Name of the hospital/organization
@@ -562,32 +603,45 @@ def generate_ethnicity_csv(
     Returns:
         The generated CSV content as a string
     """
+    demographics = demographics or {}
+    # Drop zero counts: ACS returns 0 for categories absent from a ZCTA, and for
+    # large negative sentinels that census._as_count has already clamped to 0.
+    counts = {
+        code: int(count)
+        for code, count in (demographics.get("ethnicity") or {}).items()
+        if int(count) > 0
+    }
+
+    rows: list[tuple[str, ...]]
+    if counts:
+        labels = demographics.get("ethnicity_labels") or ETHNICITY_LABELS
+        year = demographics.get("acs_year")
+        source = f"US Census ACS {year} 5-year estimates" if year else "US Census ACS 5-year estimates"
+        zcta = demographics.get("zcta")
+        if zcta:
+            source += f" for ZCTA {zcta}"
+        scaled = _scale_frequencies(counts, ETHNICITY_FREQUENCY_TOTAL)
+        rows = [
+            ("# In HL7, ethnicities are represented as Coded Elements (type CE).",),
+            ("# The format of this file is:",),
+            ("# ID of the CE, Text of the CE, Frequency represented as int.",),
+            (f"# Frequencies derived from {source}.",),
+        ]
+        rows.extend((code, labels.get(code, code), str(scaled[code])) for code in counts)
+        rows.append(('# This "nil,nil" row is interpreted as an absent ethnicity.',))
+        rows.append(("nil", "nil", str(NIL_ETHNICITY_FREQUENCY)))
+    else:
+        logger.warning(
+            "No Census ethnicity data for %s; falling back to the upstream UK "
+            "distribution. Generated patient ethnicity will not reflect this "
+            "hospital's actual population.",
+            organization_name,
+        )
+        # DEFAULT_ETHNICITY_CSV already carries the sentinel comment and row.
+        rows = list(DEFAULT_ETHNICITY_CSV)
+
     output = io.StringIO()
     writer = csv.writer(output)
-
-    if demographics and demographics.get("ethnicity"):
-        rows = list(DEFAULT_ETHNICITY_CSV)
-        ethnicity_labels = {
-            "H": "Hispanic or Latino",
-            "W": "White",
-            "B": "Black or African American",
-            "A": "Asian",
-            "HL": "Hispanic - Mexican",
-            "HP": "Hispanic - Puerto Rican",
-            "HM": "Hispanic - Cuban",
-            "AI": "American Indian and Alaska Native",
-            "NH": "Native Hawaiian and Other Pacific Islander",
-            "HO": "Hispanic - Other",
-            "SR": "Some Other Race",
-            "TM": "Two or More Races",
-        }
-        rows.extend(
-            (code, ethnicity_labels.get(code, code), str(count))
-            for code, count in demographics["ethnicity"].items()
-        )
-    else:
-        rows = DEFAULT_ETHNICITY_CSV
-
     for row in rows:
         if len(row) == 1 and row[0].startswith("#"):
             output.write(row[0] + "\n")

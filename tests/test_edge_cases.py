@@ -128,7 +128,14 @@ class TestEdgeCases:
 
     def test_ethnicity_csv_preserves_comments_with_census_data(self, tmp_path):
         demographics = {
-            "ethnicity": {"H": 100, "W": 200},
+            "ethnicity": {"2135-2": 5577, "2106-3": 7683, "2054-5": 18753},
+            "ethnicity_labels": {
+                "2135-2": "Hispanic or Latino",
+                "2106-3": "White",
+                "2054-5": "Black or African American",
+            },
+            "acs_year": 2023,
+            "zcta": "60612",
         }
         content = generate_ethnicity_csv(
             "Test Hospital",
@@ -139,8 +146,51 @@ class TestEdgeCases:
         lines = content.strip().split("\n")
         comment_lines = [line for line in lines if line.startswith("#")]
         assert len(comment_lines) >= 4
+        # The header must cite the real source rather than the upstream London note.
+        assert any("US Census ACS 2023" in line for line in comment_lines)
+        assert any("60612" in line for line in comment_lines)
+        assert not any("Ethnic_groups_in_London" in line for line in comment_lines)
+
         data_lines = [line for line in lines if not line.startswith("#") and line.strip()]
-        assert len(data_lines) == 20
+        rows = [next(csv.reader([line])) for line in data_lines]
+
+        # Census rows *replace* the UK defaults: three race rows plus the nil sentinel.
+        assert len(rows) == 4
+        ids = [row[0] for row in rows]
+        assert ids.count("nil") == 1
+        assert len(ids) == len(set(ids)), f"duplicate CE IDs in {ids}"
+        # No upstream UK single-letter codes leaked through.
+        assert not any(i in {"A", "B", "C", "H", "W"} for i in ids if i != "nil")
+        for row in rows:
+            assert int(row[2]) > 0, f"frequency must be positive: {row}"
+        # Scaled to ~1000 for 0.1% resolution.
+        assert 990 <= sum(int(row[2]) for row in rows) <= 1010
+
+    def test_ethnicity_csv_census_codes_cannot_collide_with_uk_defaults(self, tmp_path):
+        """Regression guard: appending Census rows to the UK defaults reused IDs A/B/H.
+
+        Simhospital's loader accepts duplicate CE IDs silently and just builds a
+        weighted distribution, so the collision corrupted ethnicity rather than failing.
+        """
+        demographics = {
+            "ethnicity": {"2106-3": 100, "2054-5": 200, "2135-2": 50},
+            "ethnicity_labels": {
+                "2106-3": "White",
+                "2054-5": "Black or African American",
+                "2135-2": "Hispanic or Latino",
+            },
+        }
+        content = generate_ethnicity_csv(
+            "Test Hospital", "1730209545", demographics=demographics
+        )
+        rows = [
+            row
+            for row in csv.reader(io.StringIO(content))
+            if row and not row[0].startswith("#")
+        ]
+        ids = [row[0] for row in rows]
+        assert len(ids) == len(set(ids)), f"duplicate CE IDs: {ids}"
+        assert "White - British" not in content, "UK default rows must be replaced, not kept"
 
     def test_doctors_yml_sorted_by_specialty(self):
         doctors = [
