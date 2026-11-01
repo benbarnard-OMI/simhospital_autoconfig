@@ -141,6 +141,31 @@ By default, the wrapper uses a unique temporary output directory and removes it 
 If you pass an output directory as the second argument, that directory is retained for
 inspection after validation.
 
+### Manual end-to-end smoke run
+
+The config-acceptance check above stops after Simhospital loads its configuration. To
+exercise message generation as well, run the deterministic smoke pathway against the
+checked-in config fixture:
+
+```bash
+make test-simulator-e2e
+```
+
+This runs the upstream `test_pathway_four_messages` pathway to completion and checks for
+four HL7 messages in order: `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`. It also checks
+the required segments for each type and an `OBX` in both result messages. Timestamps and
+generated patient details are allowed to vary. The run uses the local simulator binary and
+the same Simhospital checkout required by `make validate-simulator`.
+
+The end-to-end run is available through the local Make target and the manually triggered
+`Simulator end-to-end` GitHub Actions workflow. It does not run as a PR check. On success,
+local temporary output is removed. On failure, the simulator log and HL7 output are retained
+in a temporary directory whose path is printed. GitHub Actions uploads those diagnostics only
+on failure and retains them for seven days.
+
+The fixture provenance and intentional refresh procedure are documented in
+[`tests/fixtures/1730209545/README.md`](tests/fixtures/1730209545/README.md).
+
 ## Data Sources
 
 - [NPPES](https://npiregistry.cms.hhs.gov/api-page) — National Plan and Provider Enumeration System. Provides hospital name, address, taxonomies, and identifiers, and is the source for practitioner records in `doctors.yml`.

@@ -1,0 +1,63 @@
+name: Simulator end-to-end
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulator-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Check out Simhospital
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: google/simhospital
+          ref: e69eef7de3c01da3f110dda19200f84d7776fb6b
+          path: simhospital
+      - name: Pin Simhospital Bazel version
+        run: echo 5.4.1 > simhospital/.bazelversion
+      - name: Declare Simhospital's missing logrus dependency
+        run: |
+          cat >> simhospital/WORKSPACE <<'EOF'
+
+          # logrus v1.4.2 imports x/sys/unix on Linux, but this dependency is
+          # missing from the pinned revision's WORKSPACE.
+          go_repository(
+              name = "org_golang_x_sys",
+              importpath = "golang.org/x/sys",
+              version = "v0.0.0-20200930185726-fdedc70b468f",
+          )
+          EOF
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.19.1
+        with:
+          bazelisk-version: 1.29.0
+          module-root: simhospital
+      - name: Build Simhospital simulator
+        run: |
+          cd simhospital
+          bazel build //cmd/simulator:simulator
+          simulator_target="$(bazel cquery --output=files //cmd/simulator:simulator | head -n 1)"
+          test -n "$simulator_target"
+          simulator_binary="$(readlink -f "$simulator_target")"
+          test -x "$simulator_binary"
+          cp "$simulator_binary" simulator
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Run deterministic end-to-end pathway
+        env:
+          SIMULATOR_E2E_ARTIFACT_PARENT: ${{ runner.temp }}
+        run: make test-simulator-e2e
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: simulator-e2e-failure-diagnostics
+          path: ${{ runner.temp }}/simhospital-e2e-*
+          if-no-files-found: ignore
+          retention-days: 7
