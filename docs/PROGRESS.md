@@ -1,60 +1,27 @@
 # Project Progress — simhospital_autoconfig
 
-_Last updated: 2026-10-31, end of session 2. Branch pushed to origin; nothing merged._
+_Last updated: 2026-10-31. PR #33 is open. No changes are merged._
 
-## TL;DR
+## Current state
 
-Session 1 (2026-09-18) built a ~3,700 LOC generator package and left all of it uncommitted.
-Session 2 (2026-10-31) committed it on `chore/stabilize`, made the test suite and CI actually
-runnable, and then found that **the project's central claim did not hold**: of the three
-advertised data sources only NPPES had ever worked. Census returned an HTML "Missing Key"
-page on every call and CMS returned `410 Gone`, both swallowed by broad `except` blocks — so
-every "generated" fixture was really NPPES data wrapped in London defaults, plus two invented
-doctors.
+- PR #33 targets `main` from `chore/stabilize`. Its remote head is `b6d6727`.
+- The PR is mergeable. The test, simulator-validation, and Kilo review checks pass.
+- Local pytest passes with 158 tests and 7 live-API skips. The configured Ruff checks pass.
+- The local end-to-end run passes. It emits `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`.
+- The GitHub end-to-end workflow is manual-only. It has not run in Actions.
+- The PR includes the full generator and validation baseline. It is not validation-only.
+- Numeric and string NPPES identifier codes now normalize to the same two-digit value.
+- CI simulator validation now requires the Census key and strict generator checks.
+- D13 remains open. The canonical hospital does not have a usable CMS-to-NPPES match.
 
-All of that is now fixed and verified against the live APIs and the real simulator.
+## Remaining actions
 
-```
-Baseline      141 passed, 7 skipped (offline)  ·  148 passed (with API keys)  ·  ruff clean
-Deterministic 17/17 checks pass on freshly generated output
-Simulator     make validate-simulator exits 0 in ~48s — local only, see the Docker note
-CLI           all three input paths work: --npi, --zip [--name], --name --state
-Branch        chore/stabilize @ 1e1609c — PUSHED to origin, ahead of main by all of session 2
-              (exact count: `git rev-list --count origin/main..HEAD`)
-PR            none opened. GitHub's create-PR link is in the push output.
-CI            has NOT run. Both jobs are gated on push-to-main / PR-to-main only.
-```
+1. Update the PR title and description to match the full 1.0 baseline.
+2. Confirm whether the TypeSafe and Census API keys were rotated. A prior session record says the TypeSafe key appeared in a chat transcript. Do not copy secret values into this file.
+3. Use a writable checkout at the remote PR head before making more local commits. The current local Git metadata is behind the PR and is read-only.
+4. Run the manual GitHub end-to-end workflow after merge. It is manual-only and the current branch is not the default branch.
 
-### Read this before the next session
-
-**A CI result of 141 passed / 7 skipped is expected, not a regression.** Locally the count is 148
-because `typesafe_sdk` is still present in `.venv` from the broken 3.12 environment. It lives in
-the `typesafe` extra, which CI does not install, so those 7 live-API tests skip there.
-
-**CI has never executed this workflow.** The session-2 CI fixes were verified locally against the
-same commands and the same Python version (3.12), but not by an actual Actions run. Opening a PR
-is the first real execution, and the first time `pip install -e ".[dev]"` runs against a clean
-environment.
-
-**Nothing is merged.** `main` is still at `8a82936`, unchanged.
-
-### Start here next session
-
-1. **Decide on the PR.** Opening one is the only way to get a real CI signal. Expect the
-   `simulator-validation` job to pass with a "Simulator validation skipped" warning annotation —
-   that is the designed behaviour now, not a failure.
-2. **D13 is the only open functional gap.** The CMS↔NPPES join cannot be made for the canonical
-   hospital (details in Remaining work). Everything else found in session 2 is fixed.
-3. **Rotate the two API keys** in `.env` when convenient. Neither is in git history — verified by
-   scanning every commit tree in `origin/main..HEAD` — but the TypeSafe key was pasted into a chat
-   transcript.
-4. **Housekeeping**, all optional: prune the stale `roan-stranger` branch and
-   `.kilo/worktrees/roan-stranger`; delete the stale 0.1.0 artifacts in `dist/`; add `scripts/` to
-   the ruff target (~19 findings) or leave it out deliberately.
-
-Environment note: `.venv` is Python 3.12.12 via `uv`, and `.env` holds `CENSUS_API_KEY` and
-`TYPESAFE_API_KEY`. Load them with `set -a; . ./.env; set +a`. Both files are gitignored and will
-not be recreated by a clone — see `.env.example` and CONTRIBUTING.md.
+The sections below preserve the session-2 record from before PR #33. Use the current state above for active work and current validation results.
 
 ---
 
@@ -263,12 +230,12 @@ matched. Closing D13 properly needs an alias/fuzzy join or another CCN source.
 - `roan-stranger` branch and `.kilo/worktrees/roan-stranger` are stale and prunable (needs
   explicit approval — pruning deletes a branch).
 - `dist/` holds a 0.1.0 wheel+sdist predating all of this. Gitignored, harmless.
-- `scripts/` is not covered by the ruff config's lint target (CI lints `simhospital_autoconfig`
-  and `tests` only) and still has ~19 findings.
+- The Ruff target covers `scripts/run_simulator_e2e.py`. It does not cover the older helper scripts.
+  Their current lint status is unknown.
 
 ---
 
-## Session 2 commits (`chore/stabilize`, not pushed)
+## Historical session 2 commit list
 
 | SHA | Summary |
 |---|---|

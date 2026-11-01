@@ -44,7 +44,7 @@ pytest -v        # 141 passed, 7 skipped without API keys
 6. Validate generated configs against the real simulator:
 
 ```bash
-make validate-simulator
+make validate-simulator  # requires CENSUS_API_KEY and a local simulator binary
 ```
 
 ## Code Style

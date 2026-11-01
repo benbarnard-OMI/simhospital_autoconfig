@@ -44,7 +44,8 @@ CCN_IDENTIFIER_DESC_HINTS = ("oscar", "ccn")
 def _find_ccn(nppes_result: NPPESResult) -> str | None:
     """Return the CMS Certification Number from NPPES identifiers, if published."""
     for identifier in nppes_result.identifiers or []:
-        code = (identifier.code or "").strip()
+        # NPPES returns numeric identifier codes and can drop their leading zero.
+        code = str(identifier.code or "").strip().zfill(2)
         desc = (identifier.desc or "").lower()
         if code in CCN_IDENTIFIER_CODES or any(h in desc for h in CCN_IDENTIFIER_DESC_HINTS):
             value = (identifier.identifier or "").strip()

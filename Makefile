@@ -4,7 +4,6 @@ test:
 	python -m pytest -v
 
 lint:
-	python -m pip install ruff
 	ruff check simhospital_autoconfig tests scripts/run_simulator_e2e.py
 
 validate-simulator:

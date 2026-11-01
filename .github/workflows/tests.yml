@@ -12,6 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Set up Python
@@ -24,15 +25,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
       - name: Lint
-        run: |
-          python -m pip install ruff
-          ruff check simhospital_autoconfig tests scripts/run_simulator_e2e.py
+        run: ruff check simhospital_autoconfig tests scripts/run_simulator_e2e.py
       - name: Run pytest
         run: python -m pytest -v
 
   simulator-validation:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+    env:
+      CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Check out Simhospital
@@ -71,6 +73,10 @@ jobs:
           pip install -e ".[dev]"
       - name: Run simulator validation
         run: |
+          if [ -z "$CENSUS_API_KEY" ]; then
+            echo "CENSUS_API_KEY secret is required for strict simulator validation."
+            exit 1
+          fi
           cd simhospital
           bazel build //cmd/simulator:simulator
           simulator_target="$(bazel cquery --output=files //cmd/simulator:simulator | head -n 1)"

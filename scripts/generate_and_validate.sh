@@ -30,6 +30,7 @@ echo "Using interpreter: $PYTHON"
 
 "$PYTHON" -m simhospital_autoconfig generate \
     --npi "$NPI" \
+    --strict \
     --output-dir "$OUTPUT_DIR"
 
 echo ""

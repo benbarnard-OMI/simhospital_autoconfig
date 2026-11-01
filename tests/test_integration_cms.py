@@ -7,11 +7,13 @@ resolve a versioned download URL, then a CSV whose columns are human-readable.
 import pytest
 import requests_mock
 
+from simhospital_autoconfig.__main__ import _find_ccn
 from simhospital_autoconfig.cms import (
     CMS_PDC_BASE,
     HOSPITAL_GENERAL_INFO_DATASET,
     CMSClient,
 )
+from simhospital_autoconfig.nppes import NPPESClient, NPPESResult
 
 DATASET_URL = (
     f"{CMS_PDC_BASE}/metastore/schemas/dataset/items/{HOSPITAL_GENERAL_INFO_DATASET}"
@@ -168,3 +170,30 @@ def test_map_accepts_a_normalized_nppes_fallback():
     assert client.map_to_simhospital_config({"emergency_services": True})[
         "emergency_services"
     ] is True
+
+
+@pytest.mark.parametrize("identifier_code", [2, "02"])
+def test_find_ccn_normalizes_numeric_and_string_identifier_codes(identifier_code):
+    identifiers = NPPESClient()._parse_identifiers(
+        [{"code": identifier_code, "desc": "Other", "identifier": "140124"}]
+    )
+    result = NPPESResult(
+        npi="1730209545",
+        enumeration_type="NPI-2",
+        identifiers=identifiers,
+    )
+
+    assert _find_ccn(result) == "140124"
+
+
+def test_find_ccn_does_not_match_a_different_numeric_identifier_code():
+    identifiers = NPPESClient()._parse_identifiers(
+        [{"code": 5, "desc": "Other", "identifier": "not-a-ccn"}]
+    )
+    result = NPPESResult(
+        npi="1730209545",
+        enumeration_type="NPI-2",
+        identifiers=identifiers,
+    )
+
+    assert _find_ccn(result) is None
