@@ -1,26 +1,26 @@
 # Project Progress — simhospital_autoconfig
 
-_Last updated: 2026-10-31. PR #33 is open. No changes are merged._
+_Last updated: 2026-11-01. PR #33 is open. No changes are merged._
 
 ## Current state
 
 - PR #33 targets `main` from `chore/stabilize` and is open.
-- The PR is open and mergeable. The test check passes. Simulator validation stops because the repository has no `CENSUS_API_KEY` Actions secret. Kilo review is running.
+- The PR is open and mergeable. The latest completed run passed the test, simulator-validation, and Kilo review checks.
 - Local pytest and PR CI pass with 158 tests and 7 TypeSafe live-API skips. The configured Ruff checks and shell syntax checks pass.
+- Simulator validation passed all 17 deterministic checks. Simhospital loaded the generated configs.
 - The local end-to-end run passes when loopback access is available. It emits `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`.
 - The GitHub end-to-end workflow is manual-only. It has not run in Actions.
 - The PR includes the full generator and validation baseline. It is not validation-only.
 - Numeric and string NPPES identifier codes now normalize to the same two-digit value.
-- CI simulator validation now requires the Census key and strict generator checks. It fails early if the secret is absent.
+- CI simulator validation now requires the Census key and strict generator checks. It fails early if the secret is absent. The replacement key is now set in GitHub Actions.
 - D13 remains open. The canonical hospital does not have a usable CMS-to-NPPES match.
 
 ## Remaining actions
 
-1. Add a replacement `CENSUS_API_KEY` in the repository's Actions secrets, then confirm that the simulator-validation check passes.
-2. Update the PR title and description to match the full 1.0 baseline. The connected GitHub tools do not support PR edits, and the browser is signed out.
-3. Confirm whether the TypeSafe and Census API keys were rotated. A prior session record says the TypeSafe key appeared in a chat transcript. Do not copy secret values into this file.
-4. Use a writable checkout at the remote PR head before making more local commits. The current local Git metadata is behind the PR and is read-only.
-5. Run the manual GitHub end-to-end workflow after merge. It is manual-only and the current branch is not the default branch.
+1. Update the PR title and description to match the full 1.0 baseline. The connected GitHub tools do not support PR edits, and the browser is signed out.
+2. Rotate the TypeSafe API key. A prior session record says it appeared in a chat transcript. Do not copy secret values into this file.
+3. Use a writable checkout at the remote PR head before making more local commits. The current local Git metadata is behind the PR and is read-only.
+4. Run the manual GitHub end-to-end workflow after merge. It is manual-only and the current branch is not the default branch.
 
 The sections below preserve the session-2 record from before PR #33. Use the current state above for active work and current validation results.
 
