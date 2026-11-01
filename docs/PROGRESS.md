@@ -5,11 +5,12 @@ _Last updated: 2026-11-01. PR #33 is open. No changes are merged._
 ## Current state
 
 - PR #33 targets `main` from `chore/stabilize` and is open.
-- The PR is open and mergeable. The latest completed run passed the test, simulator-validation, and Kilo review checks.
+- The PR is open and mergeable. The latest completed `test` and `simulator-validation` checks passed.
 - Local pytest and PR CI pass with 158 tests and 7 TypeSafe live-API skips. The configured Ruff checks and shell syntax checks pass.
-- Simulator validation passed all 17 deterministic checks. Simhospital loaded the generated configs.
+- CI simulator validation passed all 17 deterministic checks. Simhospital loaded the generated configs.
 - The local end-to-end run passes when loopback access is available. It emits `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`.
 - The GitHub end-to-end workflow is manual-only. It has not run in Actions.
+- The latest Kilo review asked us to separate CI results from local results. This status block reports them separately.
 - The PR includes the full generator and validation baseline. It is not validation-only.
 - Numeric and string NPPES identifier codes now normalize to the same two-digit value.
 - CI simulator validation now requires the Census key and strict generator checks. It fails early if the secret is absent. The replacement key is now set in GitHub Actions.
@@ -19,8 +20,7 @@ _Last updated: 2026-11-01. PR #33 is open. No changes are merged._
 
 1. Update the PR title and description to match the full 1.0 baseline. The connected GitHub tools do not support PR edits, and the browser is signed out.
 2. Rotate the TypeSafe API key. A prior session record says it appeared in a chat transcript. Do not copy secret values into this file.
-3. Use a writable checkout at the remote PR head before making more local commits. The current local Git metadata is behind the PR and is read-only.
-4. Run the manual GitHub end-to-end workflow after merge. It is manual-only and the current branch is not the default branch.
+3. Run the manual GitHub end-to-end workflow after merge. It is manual-only and the current branch is not the default branch.
 
 The sections below preserve the session-2 record from before PR #33. Use the current state above for active work and current validation results.
 
