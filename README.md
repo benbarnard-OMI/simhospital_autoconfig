@@ -110,9 +110,17 @@ You can validate that generated configs are accepted by the real Google Simhospi
 make validate-simulator
 ```
 
-This command requires `CENSUS_API_KEY` and generates configs with `--strict` before
-it starts the local simulator. The CI job uses the same check and reads the key from
-the repository secret named `CENSUS_API_KEY`.
+This command requires `CENSUS_API_KEY` in the process environment. If you store the
+key in `.env`, load it into your shell before you run the command:
+
+```bash
+set -a; . ./.env; set +a
+make validate-simulator
+```
+
+The command generates configs with `--strict` before it starts the local simulator.
+CI uses the same check and reads the key from the repository secret named
+`CENSUS_API_KEY`.
 
 This command:
 1. Generates configs for the canonical test hospital (NPI `1730209545` — Cook County/Stroger Hospital).
