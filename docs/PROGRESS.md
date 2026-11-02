@@ -21,7 +21,9 @@ _Last updated: 2026-11-02. PR #33 is merged in `b1fc054310a8a5637f442a90fc61e95b
 - For Stroger, the expected join is CCN `140124` to NPI `1588612832`. The ZIP path fails if the enrollment row is missing, duplicated, or has no valid NPI. It also fails if NPPES cannot return that NPI. It does not write a CCN as an NPI.
 - Use `--npi 1730209545` to select that NPI directly. The ZIP path does not use HRSA 340B data. CMS and NPPES can use different names for the same facility; the README explains the source fields.
 - On the rebased branch, pytest passed: 179 passed and 7 skipped. Ruff and shell syntax checks passed. The 7 skips are live TypeSafe checks.
-- Local `make validate-simulator` stopped during NPPES lookup because this environment could not resolve `npiregistry.cms.hhs.gov`. No local Simhospital binary is available. PR simulator CI and the manual HL7 workflow are still pending.
+- GitHub checks passed on commit `d7b5dea`: pytest and Ruff, simulator build and generated-config validation, and Kilo review ([PR checks](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41448325032), [review](https://github.com/benbarnard-OMI/simhospital_autoconfig/runs/125286924460)).
+- The manual simulator HL7 workflow passed on `d7b5dea`. It built the pinned simulator and completed the four-message workflow ([run 41448507169](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41448507169)).
+- Local `make validate-simulator` stopped during NPPES lookup because this environment could not resolve `npiregistry.cms.hhs.gov`. No local Simhospital binary is available. CI passed the same simulator validation with network access.
 - Do not add catalog or CSV-header fallback logic unless current CMS data shows that the existing lookup fails. Keep the fresh PR unmerged. Do not change D13 matching behavior in this work.
 
 ## Remaining D13 actions
