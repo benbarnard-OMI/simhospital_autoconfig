@@ -203,6 +203,8 @@ class TestNameStateBranch:
             ) == 1
 
         assert "could not be verified as complete" in caplog.text
+        assert "matched 500 organizations" in caplog.text
+        assert "returned 1 result on this page" in caplog.text
         assert "--npi" in caplog.text
         assert not env.generated
 
@@ -217,6 +219,7 @@ class TestNameStateBranch:
             ) == 1
 
         assert "could not be verified as complete" in caplog.text
+        assert "did not report the total match count" in caplog.text
         assert "--npi" in caplog.text
         assert "Logging error" not in caplog.text
         assert "None" not in caplog.text

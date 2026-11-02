@@ -214,13 +214,24 @@ def _resolve_by_name(
         return None, 1
 
     if found.truncated:
+        page_count = len(found.results)
+        page_noun = "result" if page_count == 1 else "results"
+        if found.total is None:
+            result_summary = (
+                f"NPPES did not report the total match count and returned "
+                f"{page_count} {page_noun} on this page."
+            )
+        else:
+            result_summary = (
+                f"NPPES matched {found.total} organizations and returned "
+                f"{page_count} {page_noun} on this page."
+            )
         logger.error(
-            "NPPES results for %r in %s could not be verified as complete. "
-            "The API returned %d organizations, so this tool cannot select one safely. "
-            "Use --npi to select the organization directly.",
+            "NPPES results for %r in %s could not be verified as complete. %s "
+            "This tool cannot select one safely. Use --npi to select the organization directly.",
             name,
             state.upper(),
-            len(found.results),
+            result_summary,
         )
         return None, 1
 
