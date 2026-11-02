@@ -9,7 +9,7 @@ _Last updated: 2026-11-02. PR #33 is open. No changes are merged._
 - Commit `39a2cb254a67ef9a98845739da709e93cfff8e51` fixed the next 5 findings. Its `test` and `simulator-validation` checks passed in [PR run 41368015358](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41368015358).
 - A later Kilo review found issues with unknown NPPES counts, count wording, and progress status. Commits `b559575` and `6110e70` fixed them.
 - Kilo review of `6110e70` found one documentation suggestion. Commit `9a1a8b1` fixed it.
-- The `test` and `simulator-validation` checks passed on `07fbad7` in [PR run 41370562914](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41370562914). A later Kilo review asked this record to cite the completed run instead of an earlier run.
+- The `test` and `simulator-validation` checks passed on `07fbad7` in [PR run 41370562914](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41370562914). The simulator job completed at 01:08:53 UTC. The progress-only commit `8d12f9d` followed at 01:10:52 UTC.
 - Local checks on code commit `6110e70`: 174 tests passed and 7 live API tests skipped. Ruff and shell syntax checks passed.
 - Local simulator validation on `6110e70` accepted generated configs and passed all 17 deterministic checks. The HL7 run emitted `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`.
 - The GitHub HL7 end-to-end workflow is manual-only. It has not run on this PR.
