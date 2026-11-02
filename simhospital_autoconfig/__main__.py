@@ -213,6 +213,18 @@ def _resolve_by_name(
         )
         return None, 1
 
+    if found.truncated:
+        logger.error(
+            "NPPES returned %d results but showed only %d for %r in %s. "
+            "The search is incomplete, so it cannot select an organization safely. "
+            "Use --npi to select the organization directly.",
+            found.total,
+            len(found.results),
+            name,
+            state.upper(),
+        )
+        return None, 1
+
     exact = _exact_name_matches(found.results, name)
     if len(exact) == 1:
         chosen = exact[0]

@@ -147,6 +147,27 @@ def test_npi_lookup_raises_when_absent():
             NPPESClient().get_organization_by_npi(VALID_NPI)
 
 
+@pytest.mark.parametrize("results", [None, [], "missing"])
+def test_npi_lookup_raises_when_results_are_empty_or_null(results):
+    payload = {"result_count": 1}
+    if results != "missing":
+        payload["results"] = results
+    with requests_mock.Mocker() as m:
+        m.get(NPPES_API_BASE, json=payload)
+        with pytest.raises(ValueError, match="No NPPES result found"):
+            NPPESClient().get_organization_by_npi(VALID_NPI)
+
+
+def test_doctor_search_treats_null_results_as_empty():
+    with requests_mock.Mocker() as m:
+        m.get(NPPES_API_BASE, json={"result_count": 0, "results": None})
+        doctors = NPPESClient().fetch_doctors_by_location(
+            "60612", taxonomy_descriptions=("Internal Medicine",)
+        )
+
+    assert doctors == []
+
+
 def test_organization_name_falls_back_to_other_names():
     result = org("1699921007", "IGNORED")
     result["basic"].pop("organization_name")

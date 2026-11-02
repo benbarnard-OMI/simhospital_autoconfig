@@ -192,6 +192,20 @@ class TestNameStateBranch:
         assert env.nppes.search_calls == [("Rush University Medical Center", "IL")]
         assert env.census.zctas == ["60612"]
 
+    def test_truncated_results_do_not_resolve_one_exact_match(self, env, caplog):
+        env.nppes.search = NPPESearchResults(
+            [nppes_org(RUSH_NPI, "RUSH UNIVERSITY MEDICAL CENTER")],
+            500,
+        )
+        with caplog.at_level(logging.ERROR):
+            assert cli.run_generate(
+                make_args(name="Rush University Medical Center", state="IL")
+            ) == 1
+
+        assert "search is incomplete" in caplog.text
+        assert "--npi" in caplog.text
+        assert not env.generated
+
     def test_no_results_hints_at_the_legal_entity_name(self, env, caplog):
         env.nppes.search = NPPESearchResults([], 0)
         with caplog.at_level(logging.ERROR):

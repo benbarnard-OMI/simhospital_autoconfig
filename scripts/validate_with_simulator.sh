@@ -100,10 +100,12 @@ fi
 sleep 1
 if grep -q "Simulated Hospital exited with errors" "$SIM_LOG" || \
    ! kill -0 "$SIMULATOR_PID" 2>/dev/null; then
+    EXIT_CODE=0
     wait "$SIMULATOR_PID" || EXIT_CODE=$?
     cat "$SIM_LOG"
     echo "ERROR: Simulator failed during startup (exit ${EXIT_CODE:-0})."
-    exit "${EXIT_CODE:-1}"
+    if [ "$EXIT_CODE" -eq 0 ]; then EXIT_CODE=1; fi
+    exit "$EXIT_CODE"
 fi
 
 kill -TERM "$SIMULATOR_PID" 2>/dev/null || true

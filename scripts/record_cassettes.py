@@ -22,21 +22,22 @@ from typing import Any
 import requests
 import vcr
 
-from simhospital_autoconfig.census import CensusClient
-from simhospital_autoconfig.cms import CMSClient
-from simhospital_autoconfig.deterministic_checks import (
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from simhospital_autoconfig.census import CensusClient  # noqa: E402
+from simhospital_autoconfig.cms import CMSClient  # noqa: E402
+from simhospital_autoconfig.deterministic_checks import (  # noqa: E402
     format_check_report,
     run_deterministic_checks,
 )
-from simhospital_autoconfig.generators import generate_all_configs
-from simhospital_autoconfig.nppes import NPPESClient
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from simhospital_autoconfig.generators import generate_all_configs  # noqa: E402
+from simhospital_autoconfig.nppes import NPPESClient  # noqa: E402
 
 NPI = os.environ.get("FIXTURE_NPI", "1730209545")
 CASSETTE_NAME = f"test_simulator_validation[{NPI}]"
-CASSETTE_DIR = "tests/cassettes"
-OUTPUT_DIR = Path("tests") / "fixtures" / NPI
+CASSETTE_DIR = PROJECT_ROOT / "tests" / "cassettes"
+OUTPUT_DIR = PROJECT_ROOT / "tests" / "fixtures" / NPI
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("record_cassettes")

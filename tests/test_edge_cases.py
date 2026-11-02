@@ -213,6 +213,17 @@ class TestEdgeCases:
         data = yaml.safe_load(content)
         assert data["address"]["country"] == "USA"
 
+    def test_data_yml_truncates_us_zip_plus_four(self):
+        content = generate_data_yml(
+            "Test Hospital",
+            "1730209545",
+            address=NPPESAddress(
+                city="Chicago", state="IL", postal_code="606123714", country_code="US"
+            ),
+        )
+        data = yaml.safe_load(content)
+        assert data["address"]["postalcodes"] == ["60612"]
+
     def test_locations_yml_warns_on_no_emergency_services(self, minimal_nppes_result, tmp_path, caplog):
         generate_locations_yml(
             minimal_nppes_result.organization_name,
@@ -364,6 +375,17 @@ class TestEdgeCases:
         )
         data = yaml.safe_load(content)
         assert data["address"]["country"] == "CAN"
+
+    def test_non_us_postal_code_is_preserved(self):
+        content = generate_data_yml(
+            "Test Hospital",
+            "1730209545",
+            address=NPPESAddress(
+                city="Toronto", state="ON", postal_code="M5V 3L9", country_code="CAN"
+            ),
+        )
+        data = yaml.safe_load(content)
+        assert data["address"]["postalcodes"] == ["M5V 3L9"]
 
     def test_doctors_yml_invalid_specialty_preserved(self):
         content = generate_doctors_yml([

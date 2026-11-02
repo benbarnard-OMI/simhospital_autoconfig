@@ -536,7 +536,8 @@ def generate_data_yml(
     data["address"]["country"] = country
 
     if address and address.postal_code:
-        data["address"]["postalcodes"] = [address.postal_code]
+        postal_code = address.postal_code[:5] if country == "USA" else address.postal_code
+        data["address"]["postalcodes"] = [postal_code]
 
     if country == "USA":
         # The upstream template ships UK address data (London post towns and

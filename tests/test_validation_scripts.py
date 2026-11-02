@@ -114,7 +114,7 @@ def test_simulator_config_errors_fail_validation(project: Path, tmp_path: Path) 
     assert "exited before config acceptance" in result.stderr + result.stdout
 
 
-def test_simulator_runtime_error_after_loading_fails_validation(project: Path, tmp_path: Path) -> None:
+def test_simulator_runtime_error_with_zero_exit_fails_validation(project: Path, tmp_path: Path) -> None:
     config_dir = tmp_path / "configs"
     config_dir.mkdir()
 
@@ -126,7 +126,7 @@ def test_simulator_runtime_error_after_loading_fails_validation(project: Path, t
         SIMULATOR_VALIDATION_STOP_GRACE="0",
     )
 
-    assert result.returncode != 0
+    assert result.returncode == 1
     assert "failed during startup" in result.stdout
 
 

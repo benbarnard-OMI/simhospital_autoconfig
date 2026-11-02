@@ -147,10 +147,11 @@ class NPPESClient:
             "version": version,
         }
         data = self._request_with_backoff(params)
-        if not data.get("result_count") or data.get("result_count") == 0:
+        results = data.get("results") or []
+        if not results or not data.get("result_count"):
             raise ValueError(f"No NPPES result found for NPI: {npi}")
 
-        return self._parse_organization(data.get("results", [{}])[0], npi=npi)
+        return self._parse_organization(results[0], npi=npi)
 
     def _parse_organization(
         self, result: dict[str, Any], npi: str | None = None
@@ -315,7 +316,7 @@ class NPPESClient:
                 "version": "2.1",
             }
             data = self._request_with_backoff(params)
-            for result in data.get("results", []):
+            for result in data.get("results", []) or []:
                 basic = result.get("basic", {})
                 npi = result.get("number")
                 if not npi or npi in seen:

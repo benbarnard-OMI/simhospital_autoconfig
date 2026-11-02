@@ -71,6 +71,16 @@ def _run_dir() -> Path:
     return Path(tempfile.mkdtemp(prefix="simhospital-e2e-", dir=parent))
 
 
+def _cleanup_run_dir(run_dir: Path) -> None:
+    try:
+        shutil.rmtree(run_dir)
+    except OSError as exc:
+        print(
+            f"WARNING: validation passed, but artifacts remain in {run_dir}: {exc}",
+            file=sys.stderr,
+        )
+
+
 def _stop_process(process: subprocess.Popen[bytes]) -> None:
     if process.poll() is not None:
         return
@@ -86,12 +96,13 @@ def main() -> int:
     project_root = Path(__file__).resolve().parent.parent
     simhospital_dir = project_root / "simhospital"
     fixture_dir = project_root / "tests" / "fixtures" / "1730209545"
-    run_dir = _run_dir()
-    log_path = run_dir / "simulator.log"
-    output_path = run_dir / "messages.hl7"
+    run_dir: Path | None = None
     process: subprocess.Popen[bytes] | None = None
 
     try:
+        run_dir = _run_dir()
+        log_path = run_dir / "simulator.log"
+        output_path = run_dir / "messages.hl7"
         simulator = _find_simulator(project_root)
         if simulator is None:
             raise RuntimeError("local Simhospital binary not found; see README.md for the build command")
@@ -164,15 +175,17 @@ def main() -> int:
 
         message_types = validate_hl7_messages(output_path.read_text(errors="replace"))
         print(f"End-to-end validation passed: {', '.join(message_types)}")
-        shutil.rmtree(run_dir)
+        _cleanup_run_dir(run_dir)
         return 0
     except (OSError, ValueError, RuntimeError) as exc:
         if process is not None:
             _stop_process(process)
-        if not log_path.exists():
-            log_path.write_text(f"E2E validation failed before simulator startup: {exc}\n")
         print(f"ERROR: {exc}", file=sys.stderr)
-        print(f"Failure artifacts retained in: {run_dir}", file=sys.stderr)
+        if run_dir is not None:
+            log_path = run_dir / "simulator.log"
+            if not log_path.exists():
+                log_path.write_text(f"E2E validation failed before simulator startup: {exc}\n")
+            print(f"Failure artifacts retained in: {run_dir}", file=sys.stderr)
         return 1
 
 

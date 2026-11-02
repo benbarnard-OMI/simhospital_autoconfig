@@ -4,13 +4,13 @@ _Last updated: 2026-11-01. PR #33 is open. No changes are merged._
 
 ## Current state
 
-- PR #33 targets `main` from `chore/stabilize` and is open.
-- The PR is open and mergeable. The latest completed `test` and `simulator-validation` checks passed.
-- Local pytest and PR CI pass with 158 tests and 7 TypeSafe live-API skips. The configured Ruff checks and shell syntax checks pass.
-- CI simulator validation passed all 17 deterministic checks. Simhospital loaded the generated configs.
-- The local end-to-end run passes when loopback access is available. It emits `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`.
-- The GitHub end-to-end workflow is manual-only. It has not run in Actions.
-- The latest Kilo review asked us to separate CI results from local results. This status block reports them separately.
+- PR #33 targets `main` from `chore/stabilize`. It is open and unmerged.
+- At reviewed head `debb480356ff5aa805258f6df17fbf5a982122c6`, the `test` and `simulator-validation` Actions checks passed in [run 41363268774](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41363268774).
+- The latest Kilo review on that head reported 13 warnings. The PR is not ready to merge until they are resolved and reviewed again.
+- Before the warning fixes, local pytest reported 158 passed and 7 TypeSafe live-API tests skipped. Ruff and shell syntax checks passed.
+- Before the warning fixes, simulator validation accepted generated configs and passed all 17 deterministic checks. A local HL7 run emitted `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`.
+- The GitHub HL7 end-to-end workflow is manual-only. It has not run on the reviewed PR head.
+- The current worktree has uncommitted changes. Results above apply only to the reviewed PR head, not to the worktree changes.
 - The PR includes the full generator and validation baseline. It is not validation-only.
 - Numeric and string NPPES identifier codes now normalize to the same two-digit value.
 - CI simulator validation now requires the Census key and strict generator checks. It fails early if the secret is absent. The replacement key is now set in GitHub Actions.
@@ -18,11 +18,11 @@ _Last updated: 2026-11-01. PR #33 is open. No changes are merged._
 
 ## Remaining actions
 
-1. Update the PR title and description to match the full 1.0 baseline. The connected GitHub tools do not support PR edits, and the browser is signed out.
-2. Rotate the TypeSafe API key. A prior session record says it appeared in a chat transcript. Do not copy secret values into this file.
-3. Run the manual GitHub end-to-end workflow after merge. It is manual-only and the current branch is not the default branch.
+1. Resolve the 13 current Kilo review warnings.
+2. Run focused tests, the full test and lint checks, simulator validation, and the manual HL7 end-to-end workflow.
+3. Update this status record and PR #33 with results tied to the final commit. Keep D13 for follow-up work.
 
-The sections below preserve the session-2 record from before PR #33. Use the current state above for active work and current validation results.
+> **Historical record:** The sections below describe project state before PR #33. They are retained as history. Use the current state above for active work and validation results.
 
 ---
 
@@ -153,11 +153,10 @@ it mounts the config directory at `/configs/hl7_messages` and runs the image's d
 working image. An earlier note in this document guessed the mount shadowed `configs/hardcoded_messages`;
 that was wrong, and the real defect is that the invocation never points at the configs.
 
-Consequence: removing `continue-on-error` (correct in itself) would have made the CI job fail
-outright, since it has no binary and no pullable image. Resolution — CI no longer sets
-`SIMULATOR_VALIDATION`, so an absent simulator emits a `::warning` annotation and exits 0, while
-`make validate-simulator` still sets it and therefore still fails loudly for a developer who
-explicitly asked to validate. All three branches were measured, not assumed:
+At that historical point, CI no longer set `SIMULATOR_VALIDATION`, so a missing simulator produced
+a warning and exit 0. `make validate-simulator` set the flag and failed. PR #33 later replaced this
+skip behavior with a pinned simulator build and strict validation job. The three earlier outcomes
+were measured:
 
 ```
 no simulator, env unset   -> ::warning annotation, exit 0     (CI)
@@ -165,8 +164,8 @@ no simulator, env=true    -> exit 1                           (local make)
 local binary present      -> loads 3 locations, exit 0        (verified)
 ```
 
-Real simulator validation therefore happens **locally only**, against `simhospital/simulator`.
-Making it run in CI would require building the Go binary there.
+At that historical point, real simulator validation happened **locally only**, against
+`simhospital/simulator`. PR #33 later added simulator validation in CI.
 
 ---
 
