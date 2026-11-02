@@ -1,28 +1,38 @@
 # Project Progress — simhospital_autoconfig
 
-_Last updated: 2026-11-02. PR #33 is merged. CMS primary-NPI ZIP resolution is under review in PR #35._
+_Last updated: 2026-11-02. PR #33 is merged in `b1fc054310a8a5637f442a90fc61e95bf54d57a4`. CMS primary-NPI ZIP work is in a new follow-up branch._
 
 ## Current state
 
-- PR #33 merged into `main` as `b1fc054`.
-- The validation baseline includes generated-config checks, pinned simulator CI, and the manual HL7 workflow.
-- ZIP lookup now resolves one CMS Hospital General Information facility, joins its exact CCN to the primary NPI in the latest CMS Hospital Enrollments release, and fetches that NPI from NPPES.
-- For Stroger, CMS links CCN `140124` to primary NPI `1588612832`. CMS does not link NPI `1730209545` to CCN `140124`. Use `--npi 1730209545` to select that NPI directly.
-- The ZIP path fails if the CMS enrollment row is missing, duplicated, or has no valid NPI. It also fails if NPPES cannot return the primary NPI. It does not write a CCN as an NPI.
-- This change does not use HRSA 340B data for automatic matching. The CMS primary NPI is the ZIP workflow identity. Other NPIs remain available through `--npi`.
-- The status-only follow-up and the original checkout remain separate from this work.
+- PR #33 merged the 1.0 generator and validation baseline into `main`.
+- The PR checks passed on `5ba93c7`: test, simulator-validation, and Kilo Code Review ([Actions run 41372270369](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41372270369)).
+- Post-merge CI passed on `b1fc054`: test and simulator-validation ([Actions run 41378658377](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41378658377)).
+- The manual simulator E2E workflow passed on `main` at `b1fc054`. It built the pinned simulator and validated the four HL7 messages and required segments ([Actions run 41379786588](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41379786588)).
+- The initial clean-worktree baseline check passed: pytest reported 174 passed and 7 skipped live TypeSafe checks; Ruff and shell syntax checks passed; `make validate-simulator` passed all 17 deterministic checks and Simhospital loaded the generated configs.
+- Follow-up checks on 2026-11-02 passed: pytest reported 174 passed and 7 skipped; Ruff and shell syntax checks passed. The local `make validate-simulator` attempt stopped during NPPES lookup because this environment could not resolve `npiregistry.cms.hhs.gov`. This clean worktree also has no Simhospital checkout or binary. The PR simulator-validation job checks the updated branch in CI.
+- The original checkout has no unique changes that need to be carried forward. It was left unchanged.
+- D13 remains deferred. CMS links CCN `140124` to primary NPI `1588612832`, and does not link NPI `1730209545` to that enrollment. The feature branch below uses the CMS primary NPI for ZIP lookup. The current `main` branch still uses its earlier CMS-only fallback when it cannot verify one NPPES match. That fallback can write the CCN as `hl7.yml`'s `id_number` and default `hospital_service` to `MED`.
+- D13 research now has a current CMS baseline. The September 29, 2026 [Hospital Enrollments snapshot CSV](https://data.cms.gov/sites/default/files/2026-10/961708ac-2136-43cb-9587-ac64af23b6ab/Hospital_Enrollments_2026.09.29.csv) lists CCN `140124` and enrollment `O20101228000196` with NPI `1588612832`, `COOK COUNTY`, DBA `JOHN H. STROGER, JR HOSPITAL OF COOK COUNTY`, and `MULTIPLE NPI FLAG=Y`. The [interactive CMS table](https://data.cms.gov/provider-characteristics/hospitals-and-other-facilities/hospital-enrollments/data) labels this release October 2026. The matching September 29, 2026 Hospital Additional NPIs file lists 26 more NPIs for this enrollment: `1023137528`, `1043238298`, `1053942045`, `1093283533`, `1295366466`, `1336269133`, `1366073256`, `1366073355`, `1386110674`, `1396865077`, `1427689413`, `1457385775`, `1457982340`, `1457982449`, `1568093557`, `1609407691`, `1649390022`, `1649551938`, `1740811736`, `1750912648`, `1760502439`, `1790316784`, `1891329488`, `1922127844`, `1922639913`, and `1942508460` ([additional NPIs CSV](https://data.cms.gov/sites/default/files/2026-10/Hospital_Additional_NPIs_2026.09.29.csv), [CMS file guidance](https://data.cms.gov/sites/default/files/2026-07/Hospital_Data_Guidance.pdf)). NPI `1730209545` is not in the main row or this additional-NPI list. Current NPPES API queries mark both `1588612832` and `1730209545` as active Type 2 NPIs. Both list `COOK COUNTY`, address `1901 W HARRISON ST, CHICAGO, IL 60612-3714`, and taxonomy `282N00000X`; their DBA names differ ([NPI 1588612832](https://npiregistry.cms.hhs.gov/api/?number=1588612832&version=2.1), [NPI 1730209545](https://npiregistry.cms.hhs.gov/api/?number=1730209545&version=2.1)). This confirms that NPI `1730209545` remains active in NPPES. It does not link that NPI to CMS enrollment `O20101228000196`, and it does not make NPI `1588612832` a replacement for every Cook County NPI. D13 remains deferred. No matching behavior has changed.
 
-## Current validation
+## Active follow-up: CMS primary NPI for ZIP lookup
 
-- PR #35 is open and unmerged. Its code and documentation head is `5e017b7`.
-- Local full pytest passed: 179 passed, 7 skipped. Focused CMS and CLI tests passed: 48 passed. Ruff, shell syntax, and `git diff --check` passed.
-- All PR checks passed on `5e017b7`: pytest, simulator validation, and Kilo review.
-- Simulator HL7 end-to-end passed on the PR branch at `5e017b7`. It built the pinned simulator and completed all four HL7 messages with the required segments. [Run 41438572447](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41438572447).
-- Offline tests cover CMS catalog lookup, exact CCN joining, missing or duplicate rows, and the ZIP CLI path.
-- Local live CMS and NPPES checks were blocked by DNS. CMS documents `NPI` and `CCN` fields in its [Hospital Enrollments data dictionary](https://data.cms.gov/sites/default/files/2023-07/Hospital_Enrollments_Data_Dictionary.pdf). CMS says additional NPIs appear in a separate file. The live CSV was not downloaded in this sandbox.
-- The Kilo review check passed. Its earlier inline comments remain visible. They raise future catalog-format and header changes, and duplicate CCN rows. The lookup fails closed when it finds anything other than one enrollment row, as the plan requires. No behavior was added for unverified future schema changes.
+- The prior PR #35 was closed without merge. Its branch remains available. A new branch, `codex/cms-primary-npi-followup`, now contains the same focused feature on top of current `main` (`7828b43`, PR #34 merge).
+- ZIP lookup resolves one CMS Hospital General Information facility, joins its exact CCN to the primary NPI in the latest CMS Hospital Enrollments release, then fetches that NPI from NPPES.
+- For Stroger, the expected join is CCN `140124` to NPI `1588612832`. The ZIP path fails if the enrollment row is missing, duplicated, or has no valid NPI. It also fails if NPPES cannot return that NPI. It does not write a CCN as an NPI.
+- Use `--npi 1730209545` to select that NPI directly. The ZIP path does not use HRSA 340B data. CMS and NPPES can use different names for the same facility; the README explains the source fields.
+- On the rebased branch, pytest passed: 179 passed and 7 skipped. Ruff and shell syntax checks passed. The 7 skips are live TypeSafe checks.
+- Local `make validate-simulator` stopped during NPPES lookup because this environment could not resolve `npiregistry.cms.hhs.gov`. No local Simhospital binary is available. PR simulator CI and the manual HL7 workflow are still pending.
+- Do not add catalog or CSV-header fallback logic unless current CMS data shows that the existing lookup fails. Keep the fresh PR unmerged. Do not change D13 matching behavior in this work.
 
-> **Historical record:** The sections below describe work before PR #33 merged. They document earlier validation and prior ZIP behavior. Use the current state above for the active implementation.
+## Remaining D13 actions
+
+1. Decide which identifiers the generator needs. The CMS enrollment files link the CCN to 27 NPIs, while NPPES also lists active NPI `1730209545` at the same organization location. Test any proposed choice against all 27 CMS NPIs, the `1730209545` NPPES record, and the current CCN. Do not treat NPI `1588612832` as a replacement for `1730209545` without a clear rule and test evidence.
+2. Compare two D13 options before implementation:
+   - **CMS enrollment crosswalk:** Join by exact CCN and enrollment ID, then validate each listed NPI against NPPES. This avoids name-only matches. The evidence shows one CMS enrollment with 27 associated NPIs, so choosing one NPI for the hospital config has a high false-match risk until the project defines which NPI the config needs. The crosswalk itself needs monthly refreshes and checks for inactive or conflicting records. Test CCN `140124`, all 27 associated NPIs, one-to-many CCN/NPI cases, missing rows, inactive NPIs, and conflicting NPPES addresses.
+   - **Maintained alias map:** Store reviewed CCN-to-NPI links for known hospitals. An exact CCN key has low false-match risk when a person verifies each mapping and the map records the intended NPI use. A wrong or stale entry can persist until review. The initial code cost is low; staff must review and update entries when identifiers change. Test all 27 CMS NPIs, the active `1730209545` record, duplicate names at different CCNs, multiple NPIs, and a stale mapping.
+3. Do not use fuzzy name matching to choose a facility. Its false-match risk is unmeasured. Keep D13 in a separate follow-up, and get approval before adding matching behavior.
+
+> **Historical record:** The sections below describe project state before PR #33. Old Docker fallback, skip behavior, and local-only simulator claims are historical. PR #33 replaces them with required local simulator validation and a pinned simulator build in CI. Use the current state above for active work and validation results.
 
 ---
 
@@ -195,11 +205,34 @@ Growth: 68 test functions at session start (never runnable) → 148 passing. The
 
 ---
 
-## Historical ZIP behavior before CMS primary-NPI lookup
+## Remaining work
 
-Before this change, `--zip` searched NPPES by facility name and state. That join failed for Stroger because NPPES used the legal name `COOK COUNTY`, while CMS used `JOHN H STROGER JR HOSPITAL`. The old code then wrote CCN `140124` as the NPI in `hl7.yml`. This behavior is removed by the current work.
+**Features (D10) — done.** All three input paths work: `--npi`, `--zip [--name] [--state]`, and
+`--name --state`. `nppes.search_organizations()` drives the name search; `--zip` resolves through
+the existing `cms.search_hospitals()`. Every path refuses to guess when the match is not unique —
+it lists candidates with their identifiers and exits non-zero.
 
-The new lookup uses CMS Hospital Enrollments. Its primary NPI for CCN `140124` is `1588612832`. NPI `1730209545` remains active in NPPES but CMS does not link it to this CCN. The CLI continues to support direct `--npi` selection.
+Two facts established by live testing shape how usable each path is:
+
+- NPPES matches the **legal business name**, fuzzily. `--name "John H. Stroger Jr. Hospital"
+  --state IL` returns nothing (the facility is registered as `COOK COUNTY`), while `--name "RUSH
+  UNIVERSITY MEDICAL CENTER" --state IL` returns **73 exact matches**, because large systems
+  register many NPIs under one legal name across campuses and departments. So `--name` alone is
+  rarely decisive; `--npi` or `--zip --name` is the practical route.
+- `--zip` composes with `--name`/`--state` because `search_hospitals` accepts all three, and CMS
+  holds one row per facility. `--zip 60612 --name stroger` resolves cleanly to CCN 140124, and its
+  output passes 17/17 deterministic checks under `--strict` and is accepted by the real simulator
+  (3 locations, 138 doctors loaded).
+
+**Known limitation (D13), narrowed but not closed.** The CMS↔NPPES join still fails for the
+canonical hospital: NPPES names NPI `1730209545` **"COOK COUNTY"** while the catalog says **"JOHN
+H STROGER JR HOSPITAL"**, and NPPES publishes no CCN for it — only a Medicaid identifier. When
+`--zip` resolves a facility but cannot join it to exactly one NPPES record, it now synthesizes an
+`NPPESResult` from the CMS row: `hl7.yml`'s `id_number` becomes the CCN and `hospital_service`
+defaults to `MED` because there are no taxonomies to derive it from. That substitution is logged
+as a warning, and the ambiguous-join case gets its own message — an earlier version emitted both
+warnings at once, telling the user the record was absent when the real problem was that 73
+matched. Closing D13 properly needs an alias/fuzzy join or another CCN source.
 
 **Housekeeping.**
 - Rotate the TypeSafe and Census keys when convenient. Both live only in the gitignored `.env`
