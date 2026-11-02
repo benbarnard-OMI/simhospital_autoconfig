@@ -72,10 +72,11 @@ valid primary NPI, or if NPPES cannot return that NPI. It never writes a CCN int
 NPI `1730209545` to CCN `140124`; CMS lists NPI `1588612832` as that enrollment's primary NPI.
 
 The generated config uses the NPPES record for the CMS primary NPI for the organization name,
-identifier, address, and taxonomy. It uses the CMS facility row for hospital type and emergency
-services. These sources can use different names for the same enrolled facility. For example,
-NPPES names the primary NPI `COOK COUNTY`, while CMS names CCN `140124` `JOHN H STROGER JR
-HOSPITAL`.
+identifier, address, and taxonomy. CMS provides the matched facility's type and emergency-services
+details. The current generator uses the emergency-services value to report when a facility has no
+emergency services. It does not write the hospital type to a config file. These sources can use
+different names for the same enrolled facility. For example, NPPES names the primary NPI
+`COOK COUNTY`, while CMS names CCN `140124` `JOHN H STROGER JR HOSPITAL`.
 
 Additional options:
 
