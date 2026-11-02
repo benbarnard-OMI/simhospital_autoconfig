@@ -7,10 +7,10 @@ _Last updated: 2026-11-02. PR #33 is open. No changes are merged._
 - PR #33 targets `main` from `chore/stabilize`. It is open and unmerged.
 - Commit `4e4793a1e4f127233df827c2a6e92d857139bafb` fixed the 13 findings from the first Kilo review.
 - Commit `39a2cb254a67ef9a98845739da709e93cfff8e51` fixed the next 5 findings. Its `test` and `simulator-validation` checks passed in [PR run 41368015358](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41368015358).
-- A later Kilo review of `39a2cb2` found 3 issues: handling an unknown NPPES result count in log messages, clear wording for unverified search results, and an outdated progress status. Commit `b559575` fixed them.
-- Kilo review of `b559575` found one more issue: the log message mixed the total match count with the page size. Commit `6110e70` reports those values separately.
-- Local checks after these code fixes: 174 tests passed and 7 live API tests skipped. Ruff and shell syntax checks passed.
-- Local simulator validation on `39a2cb2` accepted generated configs and passed all 17 deterministic checks. The local HL7 run emitted `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`. The later code changes only update NPPES error messages and tests.
+- A later Kilo review found issues with unknown NPPES counts, count wording, and progress status. Commits `b559575` and `6110e70` fixed them.
+- The latest Kilo review found one documentation suggestion. Commit `9a1a8b1` fixed it. All three checks passed in [PR run 41369997188](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41369997188).
+- Local checks on code commit `6110e70`: 174 tests passed and 7 live API tests skipped. Ruff and shell syntax checks passed.
+- Local simulator validation on `6110e70` accepted generated configs and passed all 17 deterministic checks. The HL7 run emitted `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`.
 - The GitHub HL7 end-to-end workflow is manual-only. It has not run on this PR.
 - The PR includes the full generator and validation baseline. It is not validation-only.
 - Numeric and string NPPES identifier codes now normalize to the same two-digit value.
@@ -19,8 +19,8 @@ _Last updated: 2026-11-02. PR #33 is open. No changes are merged._
 
 ## Remaining actions
 
-1. Review the latest Actions and Kilo results on PR #33 before merge.
-2. Keep D13 for follow-up work. Keep PR #33 open and unmerged until the owner approves merge.
+1. Keep D13 for follow-up work.
+2. PR #33 is ready for owner review. Merge is outside this work.
 
 > **Historical record:** The sections below describe project state before PR #33. Old Docker fallback, skip behavior, and local-only simulator claims are historical. PR #33 replaces them with required local simulator validation and a pinned simulator build in CI. Use the current state above for active work and validation results.
 
