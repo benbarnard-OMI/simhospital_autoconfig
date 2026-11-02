@@ -184,7 +184,12 @@ def main() -> int:
         if run_dir is not None:
             log_path = run_dir / "simulator.log"
             if not log_path.exists():
-                log_path.write_text(f"E2E validation failed before simulator startup: {exc}\n")
+                try:
+                    log_path.write_text(
+                        f"E2E validation failed before simulator startup: {exc}\n"
+                    )
+                except OSError as write_exc:
+                    print(f"WARNING: could not write failure log: {write_exc}", file=sys.stderr)
             print(f"Failure artifacts retained in: {run_dir}", file=sys.stderr)
         return 1
 

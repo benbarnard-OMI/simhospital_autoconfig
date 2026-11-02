@@ -332,11 +332,13 @@ def _resolve_by_zip(
     state = (hospital_data.get("address") or {}).get("state")
     name = hospital_data.get("hospital_name")
     exact: list[NPPESResult] = []
+    nppes_search_truncated = False
     if name and state:
         try:
-            exact = _exact_name_matches(
-                nppes_client.search_organizations(name, state).results, name
-            )
+            found = nppes_client.search_organizations(name, state)
+            nppes_search_truncated = found.truncated
+            if not found.truncated:
+                exact = _exact_name_matches(found.results, name)
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("NPPES search failed (%s); using the CMS record alone", exc)
 
@@ -362,14 +364,25 @@ def _resolve_by_zip(
         )
         return _synthesize_from_cms(hospital_data), hospital_data, 0
 
-    logger.warning(
-        "No NPPES organization is registered as %r -- NPPES often records the legal "
-        "entity instead (John H. Stroger Jr. Hospital is 'COOK COUNTY'). Falling back "
-        "to the CMS record: hl7.yml id_number will be CCN %s and hospital_service will "
-        "default to MED.",
-        name,
-        hospital_data.get("ccn"),
-    )
+    if nppes_search_truncated:
+        logger.warning(
+            "NPPES search results for %r in %s were truncated, so this tool will not "
+            "use an exact match from an incomplete page. Falling back to the CMS "
+            "record: hl7.yml id_number will be CCN %s and hospital_service will "
+            "default to MED. Re-run with --npi to select the organization directly.",
+            name,
+            state,
+            hospital_data.get("ccn"),
+        )
+    else:
+        logger.warning(
+            "No NPPES organization is registered as %r -- NPPES often records the legal "
+            "entity instead (John H. Stroger Jr. Hospital is 'COOK COUNTY'). Falling back "
+            "to the CMS record: hl7.yml id_number will be CCN %s and hospital_service will "
+            "default to MED.",
+            name,
+            hospital_data.get("ccn"),
+        )
     return _synthesize_from_cms(hospital_data), hospital_data, 0
 
 

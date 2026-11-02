@@ -64,6 +64,29 @@ def test_main_reports_temporary_directory_creation_error_without_traceback(monke
     assert "Failure artifacts retained" not in captured.err
 
 
+def test_main_preserves_original_error_when_failure_log_cannot_be_written(
+    monkeypatch, capsys, tmp_path
+):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    monkeypatch.setattr(run_simulator_e2e, "_run_dir", lambda: run_dir)
+    monkeypatch.setattr(run_simulator_e2e, "_find_simulator", lambda _root: None)
+    original_write_text = run_simulator_e2e.Path.write_text
+
+    def fail_simulator_log(path, *args, **kwargs):
+        if path.name == "simulator.log":
+            raise OSError("disk is full")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(run_simulator_e2e.Path, "write_text", fail_simulator_log)
+
+    assert run_simulator_e2e.main() == 1
+    captured = capsys.readouterr()
+    assert "ERROR: local Simhospital binary not found" in captured.err
+    assert "WARNING: could not write failure log: disk is full" in captured.err
+    assert "Traceback" not in captured.err
+
+
 def test_cleanup_failure_warns_without_raising(monkeypatch, capsys, tmp_path):
     def fail_remove(path):
         raise OSError("permission denied")

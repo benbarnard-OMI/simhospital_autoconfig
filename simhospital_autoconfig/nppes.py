@@ -77,11 +77,12 @@ class NPPESearchResults:
     """
 
     results: list[NPPESResult]
-    total: int = 0
+    total: int | None = None
 
     @property
     def truncated(self) -> bool:
-        return self.total > len(self.results)
+        # An unknown total cannot prove that the returned page is complete.
+        return self.total is None or self.total > len(self.results)
 
 
 # NPPES caps a single response; ask for the maximum so an exact match is not missed.
@@ -222,11 +223,15 @@ class NPPESClient:
             "version": version,
         }
         data = self._request_with_backoff(params)
-        total = int(data.get("result_count") or 0)
+        raw_total = data.get("result_count")
+        try:
+            total = int(raw_total) if raw_total is not None else None
+        except (TypeError, ValueError):
+            total = None
         results = [
             self._parse_organization(result) for result in data.get("results", []) or []
         ]
-        if total > len(results):
+        if total is not None and total > len(results):
             logger.warning(
                 "NPPES matched %d organizations for %r in %s but returned only %d; "
                 "an exact match may be missing. Narrow the search or use --npi.",

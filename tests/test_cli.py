@@ -302,6 +302,22 @@ class TestZipBranch:
         assert cli.run_generate(make_args(zip="60612", dry_run=False)) == 0
         assert len(env.cms.search_calls) == 1
 
+    def test_zip_path_does_not_join_from_a_truncated_nppes_page(self, env, caplog):
+        env.cms.rows = [CMS_ROW]
+        env.nppes.search = NPPESearchResults(
+            [nppes_org(RUSH_NPI, "JOHN H STROGER JR HOSPITAL")], 500
+        )
+
+        with caplog.at_level(logging.WARNING):
+            assert cli.run_generate(make_args(zip="60612", dry_run=False)) == 0
+
+        nppes_result, kwargs = env.generated[0]
+        assert nppes_result.npi == STROGER_CCN
+        assert kwargs["hospital_data"]["ccn"] == STROGER_CCN
+        assert "search results" in caplog.text
+        assert "truncated" in caplog.text
+        assert "--npi" in caplog.text
+
     def test_falls_back_to_a_synthesized_record_when_nppes_has_no_match(self, env, caplog):
         env.cms.rows = [CMS_ROW]
         env.nppes.search = NPPESearchResults([], 0)  # NPPES knows it as "COOK COUNTY"

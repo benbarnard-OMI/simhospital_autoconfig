@@ -121,8 +121,20 @@ def test_missing_result_count_is_tolerated():
         m.get(NPPES_API_BASE, json={"results": [org("1699921007", "RUSH")]})
         found = NPPESClient().search_organizations("Rush", "IL")
 
-    assert found.total == 0
+    assert found.total is None
     assert len(found.results) == 1
+    assert found.truncated
+
+
+@pytest.mark.parametrize("result_count", ["many", None])
+def test_unusable_result_count_fails_closed(result_count):
+    payload = {"result_count": result_count, "results": [org("1699921007", "RUSH")]}
+    with requests_mock.Mocker() as m:
+        m.get(NPPES_API_BASE, json=payload)
+        found = NPPESClient().search_organizations("Rush", "IL")
+
+    assert found.total is None
+    assert found.truncated
 
 
 def test_npi_lookup_still_works_after_the_shared_parser_refactor():
