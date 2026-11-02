@@ -1,0 +1,12 @@
+# Test and development dependencies.
+#
+# The canonical source is pyproject.toml -> [project.optional-dependencies].
+# Prefer:  pip install -e ".[dev]"
+# This file is kept in sync so `pip install -r requirements.txt` also works.
+
+requests>=2.28,<3.0
+pyyaml>=6.0,<7.0
+pytest>=7.0,<8.0
+requests-mock>=1.10,<2.0
+# vcrpy <6 is incompatible with urllib3 2.x.
+vcrpy>=6.0

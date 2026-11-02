@@ -1,3 +1,25 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+.env
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+.pytest_cache/
+
+# Vendored google/simhospital clone used as the schema/runtime reference.
+# Contains an ~89MB built Go binary and bazel-* symlinks; not part of this package.
+simhospital/
+
+# Agent tooling state. Session plans worth keeping are copied into docs/plans/.
+.kilo/
+
+# Scratch output from `make validate-simulator` and manual CLI runs.
+tmp-config/

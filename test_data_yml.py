@@ -13,6 +13,12 @@ def assert_has_type(parent_dict, key, expected_type):
     assert key in parent_dict
     assert isinstance(parent_dict[key], expected_type)
 
+def assert_in_range(parent_dict, key, min_val, max_val):
+    assert key in parent_dict
+    val = parent_dict[key]
+    assert isinstance(val, (int, float)), f"Value for '{key}' is not numeric: {val}"
+    assert min_val <= val <= max_val, f"Value for '{key}' is {val}, expected between {min_val} and {max_val}"
+
 
 def test_data_yml_is_valid_yaml(data_yml):
     """Verify that data.yml is valid YAML."""
@@ -31,6 +37,8 @@ def test_allergy_section(data_yml):
     assert_non_empty_list(allergy, 'reactions')
     assert_has_type(allergy, 'percentage', int)
     assert_has_type(allergy, 'maximum_allergies', int)
+    assert_in_range(allergy, 'percentage', 0, 100)
+    assert_in_range(allergy, 'maximum_allergies', 1, float('inf'))
 
 def test_patient_name_section(data_yml):
     """Verify the patient_name section in data.yml."""
@@ -44,6 +52,9 @@ def test_patient_name_section(data_yml):
     assert_non_empty_list(patient_name, 'female_prefixes')
     assert_non_empty_list(patient_name, 'male_prefixes')
     assert_has_type(patient_name, 'middlename_percentage', int)
+    assert_in_range(patient_name, 'degree_percentage', 0, 100)
+    assert_in_range(patient_name, 'suffix_percentage', 0, 100)
+    assert_in_range(patient_name, 'middlename_percentage', 0, 100)
 
 def test_address_section(data_yml):
     """Verify the address section in data.yml."""

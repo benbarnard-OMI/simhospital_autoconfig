@@ -1,0 +1,13 @@
+# In HL7, ethnicities are represented as Coded Elements (type CE).
+# The format of this file is:
+# ID of the CE, Text of the CE, Frequency represented as int.
+# Frequencies derived from US Census ACS 2023 5-year estimates for ZCTA 60612.
+2135-2,Hispanic or Latino,161
+2106-3,White,221
+2054-5,Black or African American,540
+1002-5,American Indian or Alaska Native,1
+2028-9,Asian,44
+2076-8,Native Hawaiian or Other Pacific Islander,1
+2131-1,Some other race or two or more races,32
+# This "nil,nil" row is interpreted as an absent ethnicity.
+nil,nil,2

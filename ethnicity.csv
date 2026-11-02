@@ -2,6 +2,9 @@
 # The format of this file is:
 # ID of the CE, Text of the CE, Frequency represented as int.
 # The frequencies have been derived from https://en.wikipedia.org/wiki/Ethnic_groups_in_London
+#
+# A "nil,nil" row is a reserved sentinel meaning "absent ethnicity".
+# Consumers must handle this row gracefully and not attempt to map it to a real ethnicity.
 A,White - British,449
 B,White - Irish,22
 C,White - Other,127

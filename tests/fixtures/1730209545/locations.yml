@@ -1,0 +1,18 @@
+ED:
+  poc: ED
+  facility: COOK COUNTY
+  floor: 1
+  room: ED
+  type: ED
+Renal:
+  poc: RenalWard
+  facility: COOK COUNTY
+  building: Main Building
+  floor: 5
+  room: MainRoom
+Non-renal:
+  poc: OtherWard
+  facility: COOK COUNTY
+  building: Main Building
+  floor: 4
+  room: MainRoom

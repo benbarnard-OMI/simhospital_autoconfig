@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simhospital-autoconfig"
+version = "0.1.0"
+description = "Automatically configure Google Simhospital to mirror real-world hospital traits using public data sources."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.28,<3.0",
+    "pyyaml>=6.0,<7.0",
+]
+
+[project.scripts]
+simhospital-autoconfig = "simhospital_autoconfig.__main__:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0,<8.0",
+    "requests-mock>=1.10,<2.0",
+    # vcrpy <6 is incompatible with urllib3 2.x (VCRHTTPResponse lacks version_string).
+    "vcrpy>=6.0",
+    # Pinned: ruff's default rule set has changed between releases, and an unpinned
+    # linter makes CI results drift (ruff 0.17 defaults surfaced 201 findings here).
+    "ruff==0.17.3",
+]
+typesafe = [
+    "typesafe-sdk",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["simhospital_autoconfig*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "."]
+addopts = "-v"
+# The vendored google/simhospital clone ships Python tests under bazel-* symlinks;
+# without this, pytest collects ~51 unrelated FHIR/protobuf test files and aborts.
+norecursedirs = [
+    "simhospital",
+    ".venv",
+    ".kilo",
+    ".git",
+    "dist",
+    "build",
+    "*.egg-info",
+    "__pycache__",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+extend-exclude = ["simhospital"]
+
+[tool.ruff.lint]
+# Declared explicitly rather than relying on ruff's defaults, which have changed
+# across releases and are not stable for an unpinned linter in CI.
+select = ["E", "F", "I", "UP", "FA", "B", "BLE"]
+
+[tool.ruff.lint.per-file-ignores]
+# BLE001 (blind `except Exception`) is intentional in these two modules:
+#   __main__.py             each data source is fetched independently and a failure
+#                           degrades to defaults rather than aborting generation
+#                           (documented under README "Limitations").
+#   deterministic_checks.py every check is wrapped so a raised error is reported as a
+#                           failed check (False, reason) instead of propagating.
+# NOTE: this broad degradation is exactly what let the dead CMS endpoint and the
+# missing Census key pass unnoticed. Making it loud is tracked as defects D3/D8 in
+# docs/PROGRESS.md; revisit these ignores when that lands.
+"simhospital_autoconfig/__main__.py" = ["BLE001"]
+"simhospital_autoconfig/deterministic_checks.py" = ["BLE001"]
+# Tests exercise failure paths and assert on raised exceptions.
+"tests/*" = ["BLE001"]
+# The Jev `instructions=` values are natural-language prompts; wrapping them
+# mid-sentence costs more readability than the over-length line does.
+"tests/test_typesafe_validation.py" = ["BLE001", "E501"]
