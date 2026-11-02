@@ -28,6 +28,7 @@ from simhospital_autoconfig.nppes import (
 
 RUSH_NPI = "1699921007"
 STROGER_CCN = "140124"
+STROGER_NPI = "1588612832"
 
 CMS_ROW = {
     "Facility ID": STROGER_CCN,
@@ -64,12 +65,14 @@ class FakeNPPES(NPPESClient):
         self.doctors = doctors or []
         self.search_calls = []
         self.doctor_calls = []
+        self.npi_calls = []
 
     def search_organizations(self, organization_name, state, **kwargs):
         self.search_calls.append((organization_name, state))
         return self.search
 
     def get_organization_by_npi(self, npi, **kwargs):
+        self.npi_calls.append(npi)
         if self.by_npi is None:
             raise ValueError(f"No NPPES result found for NPI: {npi}")
         return self.by_npi
@@ -82,10 +85,12 @@ class FakeNPPES(NPPESClient):
 class FakeCMS(CMSClient):
     """Keeps the real map_to_simhospital_config; only the download is faked."""
 
-    def __init__(self, rows=None):
+    def __init__(self, rows=None, enrollment_npi=STROGER_NPI):
         super().__init__()
         self.rows = rows or []
+        self.enrollment_npi = enrollment_npi
         self.search_calls = []
+        self.enrollment_calls = []
 
     def search_hospitals(self, **kwargs):
         self.search_calls.append(kwargs)
@@ -93,6 +98,12 @@ class FakeCMS(CMSClient):
 
     def load_rows(self):
         return list(self.rows)
+
+    def get_primary_npi_by_ccn(self, ccn):
+        self.enrollment_calls.append(ccn)
+        if isinstance(self.enrollment_npi, Exception):
+            raise self.enrollment_npi
+        return self.enrollment_npi
 
 
 class FakeCensus:
@@ -173,7 +184,7 @@ class TestArgumentDispatch:
 
     def test_zip_plus_four_is_accepted_and_truncated(self, env):
         env.cms.rows = [CMS_ROW]
-        env.nppes.search = NPPESearchResults([], 0)
+        env.nppes.by_npi = nppes_org(STROGER_NPI, "COOK COUNTY")
         assert cli.run_generate(make_args(zip="60612-3714")) == 0
         assert env.cms.search_calls[0]["zip_code"] == "60612"
 
@@ -289,98 +300,63 @@ class TestZipBranch:
         env.cms.rows = [
             {**CMS_ROW, "Facility ID": "140119", "Facility Name": "RUSH UNIVERSITY MEDICAL CENTER"}
         ]
-        env.nppes.search = NPPESearchResults(
-            [nppes_org(RUSH_NPI, "RUSH UNIVERSITY MEDICAL CENTER")], 1
-        )
+        env.nppes.by_npi = nppes_org(STROGER_NPI, "RUSH UNIVERSITY MEDICAL CENTER")
         assert cli.run_generate(make_args(zip="60612", name="rush")) == 0
         assert env.cms.search_calls[0]["name"] == "rush"
         assert env.cms.search_calls[0]["zip_code"] == "60612"
 
-    def test_single_facility_joins_to_a_real_nppes_record(self, env):
+    def test_zip_uses_cms_primary_npi_for_nppes_and_hl7_config(
+        self, env, tmp_path, monkeypatch
+    ):
         env.cms.rows = [CMS_ROW]
-        env.nppes.search = NPPESearchResults(
-            [nppes_org(RUSH_NPI, "JOHN H STROGER JR HOSPITAL")], 1
-        )
+        env.nppes.by_npi = nppes_org(STROGER_NPI, "COOK COUNTY")
         env.nppes.doctors = [{"id": "1", "surname": "A", "firstname": "B", "prefix": "Dr", "specialty": "MED"}]
 
-        assert cli.run_generate(make_args(zip="60612", dry_run=False)) == 0
+        from simhospital_autoconfig.generators import generate_all_configs as real_generate
 
-        nppes_result, kwargs = env.generated[0]
-        assert nppes_result.npi == RUSH_NPI, "should use the real NPI, not the CCN"
-        # The catalog row is already in hand, so it is passed straight through.
-        assert kwargs["hospital_data"]["ccn"] == STROGER_CCN
-        assert kwargs["hospital_data"]["emergency_services"] is True
-        assert kwargs["hospital_data"]["hospital_type"] == "Acute Care Hospitals"
+        monkeypatch.setattr(cli, "generate_all_configs", real_generate)
+        assert cli.run_generate(
+            make_args(zip="60612", name="stroger", dry_run=False, output_dir=str(tmp_path))
+        ) == 0
+
+        assert env.cms.search_calls[0]["name"] == "stroger"
+        assert env.cms.enrollment_calls == [STROGER_CCN]
+        assert env.nppes.npi_calls == [STROGER_NPI]
+        assert not env.nppes.search_calls
+        assert "id_number: '1588612832'" in (tmp_path / "hl7.yml").read_text()
+        assert STROGER_CCN not in (tmp_path / "hl7.yml").read_text()
 
     def test_catalog_is_queried_only_once(self, env):
         """The --zip path already has the row; the shared tail must not re-join."""
         env.cms.rows = [CMS_ROW]
-        env.nppes.search = NPPESearchResults(
-            [nppes_org(RUSH_NPI, "JOHN H STROGER JR HOSPITAL")], 1
-        )
+        env.nppes.by_npi = nppes_org(STROGER_NPI, "COOK COUNTY")
         assert cli.run_generate(make_args(zip="60612", dry_run=False)) == 0
         assert len(env.cms.search_calls) == 1
 
-    @pytest.mark.parametrize("result_count", [500, None])
-    def test_zip_path_does_not_join_from_an_unverified_nppes_page(
-        self, env, caplog, result_count
-    ):
+    def test_missing_enrollment_npi_fails_and_never_generates(self, env, caplog):
         env.cms.rows = [CMS_ROW]
-        env.nppes.search = NPPESearchResults(
-            [nppes_org(RUSH_NPI, "JOHN H STROGER JR HOSPITAL")], result_count
-        )
+        env.cms.enrollment_npi = ValueError("duplicate CCN rows; use --npi")
 
         with caplog.at_level(logging.WARNING):
-            assert cli.run_generate(make_args(zip="60612", dry_run=False)) == 0
-
-        nppes_result, kwargs = env.generated[0]
-        assert nppes_result.npi == STROGER_CCN
-        assert kwargs["hospital_data"]["ccn"] == STROGER_CCN
-        assert "search results" in caplog.text
-        assert "could not be verified as complete" in caplog.text
-        assert "truncated" not in caplog.text
+            assert cli.run_generate(make_args(zip="60612", dry_run=False)) == 1
+        assert "duplicate CCN rows" in caplog.text
         assert "--npi" in caplog.text
+        assert not env.generated
 
-    def test_falls_back_to_a_synthesized_record_when_nppes_has_no_match(self, env, caplog):
+    def test_nppes_failure_fails_and_never_generates(self, env, caplog):
         env.cms.rows = [CMS_ROW]
-        env.nppes.search = NPPESearchResults([], 0)  # NPPES knows it as "COOK COUNTY"
+        env.cms.enrollment_npi = STROGER_NPI
 
         with caplog.at_level(logging.WARNING):
-            assert cli.run_generate(make_args(zip="60612", dry_run=False)) == 0
-
-        nppes_result, kwargs = env.generated[0]
-        assert nppes_result.npi == STROGER_CCN, "CCN stands in for the NPI"
-        assert nppes_result.organization_name == "JOHN H STROGER JR HOSPITAL"
-        assert nppes_result.address.postal_code == "60612"
-        assert nppes_result.taxonomies is None
-        assert kwargs["hospital_data"] is not None
-        # The substitution must be announced, not silent.
-        assert "COOK COUNTY" in caplog.text
-        assert STROGER_CCN in caplog.text
-        assert "share the exact name" not in caplog.text
+            assert cli.run_generate(make_args(zip="60612", dry_run=False)) == 1
+        assert "Use --npi" in caplog.text
+        assert not env.generated
 
     def test_census_uses_the_cms_zip(self, env):
         env.cms.rows = [CMS_ROW]
-        env.nppes.search = NPPESearchResults([], 0)
+        env.nppes.by_npi = nppes_org(STROGER_NPI, "COOK COUNTY")
         assert cli.run_generate(make_args(zip="60612")) == 0
         assert env.census.zctas == ["60612"]
-
-    def test_ambiguous_nppes_join_uses_the_cms_record(self, env, caplog):
-        env.cms.rows = [CMS_ROW]
-        env.nppes.search = NPPESearchResults(
-            [
-                nppes_org("1111111111", "JOHN H STROGER JR HOSPITAL"),
-                nppes_org("2222222222", "JOHN H STROGER JR HOSPITAL"),
-            ],
-            2,
-        )
-        with caplog.at_level(logging.WARNING):
-            assert cli.run_generate(make_args(zip="60612", dry_run=False)) == 0
-        nppes_result, _ = env.generated[0]
-        assert nppes_result.npi == STROGER_CCN
-        # Ambiguity and absence call for different advice, so they must not both fire.
-        assert "share the exact name" in caplog.text
-        assert "No NPPES organization is registered" not in caplog.text
 
 
 class TestValidationExitCodes:
@@ -399,6 +375,7 @@ class TestValidationExitCodes:
     def test_all_checks_passing_exits_zero(self, env):
         env.nppes.by_npi = nppes_org("1730209545", "COOK COUNTY")
         assert cli.run_generate(make_args(npi="1730209545", dry_run=False, strict=True)) == 0
+        assert env.nppes.npi_calls == ["1730209545"]
 
     def test_dry_run_does_not_generate(self, env):
         env.nppes.by_npi = nppes_org("1730209545", "COOK COUNTY")

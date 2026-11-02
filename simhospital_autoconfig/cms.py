@@ -18,10 +18,9 @@ things differ from the old API:
 * Column names are human-readable ("Facility ID", "City/Town") rather than
   Socrata snake_case, and ``Emergency Services`` is "Yes"/"No", not "Y"/"N".
 
-The catalog has no NPI column, so an NPI cannot be resolved directly. The usable
-join keys are the CCN (``Facility ID``), or facility name plus state. NPPES does
-not always publish a CCN -- for NPI 1730209545 it exposes only a Medicaid
-identifier -- so name-plus-state is the practical path.
+Hospital General Information has no NPI column. The CMS Hospital Enrollments
+dataset links its CCN to the primary NPI. This client discovers the latest
+enrollment CSV through the CMS open data catalog.
 """
 
 from __future__ import annotations
@@ -38,6 +37,8 @@ logger = logging.getLogger(__name__)
 
 CMS_PDC_BASE = "https://data.cms.gov/provider-data/api/1"
 HOSPITAL_GENERAL_INFO_DATASET = "xubh-q36u"
+CMS_OPEN_DATA_CATALOG = "https://data.cms.gov/data.json"
+HOSPITAL_ENROLLMENTS_SERIES = "Hospital Enrollments"
 
 # Column names exactly as they appear in the Hospital General Information CSV.
 COL_FACILITY_ID = "Facility ID"
@@ -72,6 +73,8 @@ class CMSClient:
         self.timeout = timeout
         self._rows: list[dict[str, str]] | None = None
         self._download_url: str | None = None
+        self._enrollment_rows: list[dict[str, str]] | None = None
+        self._enrollment_download_url: str | None = None
 
     def _get_json(self, url: str, params: dict[str, str] | None = None) -> Any:
         response = requests.get(url, params=params, timeout=self.timeout)
@@ -120,6 +123,82 @@ class CMSClient:
         self._rows = list(csv.DictReader(io.StringIO(text)))
         logger.info("Loaded %d CMS hospital rows", len(self._rows))
         return self._rows
+
+    def resolve_enrollment_download_url(self) -> str:
+        """Find the latest Hospital Enrollments CSV in the CMS catalog."""
+        if self._enrollment_download_url:
+            return self._enrollment_download_url
+
+        catalog = self._get_json(CMS_OPEN_DATA_CATALOG)
+        series = [
+            item
+            for item in catalog.get("datasetSeries") or []
+            if item.get("title") == HOSPITAL_ENROLLMENTS_SERIES
+        ]
+        if len(series) != 1:
+            raise ValueError(
+                "CMS catalog did not contain one Hospital Enrollments dataset series"
+            )
+        latest_id = (series[0].get("last") or {}).get("@id")
+        if not latest_id:
+            raise ValueError("CMS catalog has no latest Hospital Enrollments release")
+
+        releases = [
+            item
+            for item in catalog.get("dataset") or []
+            if item.get("@id") == latest_id
+        ]
+        if len(releases) != 1:
+            raise ValueError("CMS catalog did not identify one latest enrollment release")
+        csv_files = [
+            item
+            for item in releases[0].get("distribution", [])
+            if item.get("mediaType") == "text/csv" and item.get("downloadURL")
+        ]
+        if len(csv_files) != 1:
+            raise ValueError("Latest CMS Hospital Enrollments release has no unique CSV")
+
+        self._enrollment_download_url = csv_files[0]["downloadURL"]
+        return self._enrollment_download_url
+
+    def load_enrollment_rows(self) -> list[dict[str, str]]:
+        """Download and cache the latest CMS Hospital Enrollments CSV."""
+        if self._enrollment_rows is not None:
+            return self._enrollment_rows
+
+        url = self.resolve_enrollment_download_url()
+        logger.info("Downloading CMS Hospital Enrollments from %s", url)
+        response = requests.get(url, timeout=self.timeout)
+        response.raise_for_status()
+        try:
+            text = response.content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            # CMS enrollment files can contain Windows-1252 punctuation.
+            text = response.content.decode("cp1252")
+        self._enrollment_rows = list(csv.DictReader(io.StringIO(text)))
+        logger.info("Loaded %d CMS enrollment rows", len(self._enrollment_rows))
+        return self._enrollment_rows
+
+    def get_primary_npi_by_ccn(self, ccn: str) -> str:
+        """Return the single primary enrollment NPI for an exact CCN."""
+        wanted = (ccn or "").strip()
+        matches = [
+            row
+            for row in self.load_enrollment_rows()
+            if (row.get("CCN") or "").strip() == wanted
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"CMS Hospital Enrollments has {len(matches)} rows for CCN {wanted}; "
+                "use --npi to select an organization directly"
+            )
+        npi = (matches[0].get("NPI") or "").strip()
+        if not re.fullmatch(r"[0-9]{10}", npi):
+            raise ValueError(
+                f"CMS Hospital Enrollments has no valid primary NPI for CCN {wanted}; "
+                "use --npi to select an organization directly"
+            )
+        return npi
 
     def get_hospital_by_ccn(self, ccn: str) -> dict[str, str]:
         """

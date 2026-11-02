@@ -26,7 +26,7 @@ from .cms import (
 )
 from .deterministic_checks import format_check_report, run_deterministic_checks
 from .generators import generate_all_configs
-from .nppes import NPPESAddress, NPPESClient, NPPESResult
+from .nppes import NPPESClient, NPPESResult
 
 logging.basicConfig(
     level=logging.INFO,
@@ -249,32 +249,6 @@ def _resolve_by_name(
     return None, 1
 
 
-def _synthesize_from_cms(hospital: dict[str, Any]) -> NPPESResult:
-    """Build an NPPESResult from a mapped CMS record when NPPES has no match.
-
-    The CMS Facility ID (a CCN) stands in for the NPI and therefore ends up in
-    hl7.yml's id_number; the caller logs that. There are no taxonomies, so
-    hospital_service falls back to MED rather than claiming a specialty.
-    """
-    address = hospital.get("address") or {}
-    return NPPESResult(
-        npi=str(hospital.get("ccn") or ""),
-        enumeration_type="NPI-2",
-        organization_name=hospital.get("hospital_name"),
-        address=NPPESAddress(
-            address_1=address.get("street"),
-            city=address.get("city"),
-            state=address.get("state"),
-            postal_code=address.get("postal_code"),
-            country_code="US",
-            address_purpose="LOCATION",
-        ),
-        taxonomies=None,
-        identifiers=None,
-        raw_response=None,
-    )
-
-
 def _resolve_by_zip(
     cms_client: CMSClient, nppes_client: NPPESClient, args: argparse.Namespace
 ) -> tuple[NPPESResult | None, dict[str, Any] | None, int]:
@@ -338,63 +312,32 @@ def _resolve_by_zip(
         hospital_data.get("ccn"),
     )
 
-    # Prefer a real NPPES record: it carries taxonomies, which decide hospital_service.
-    state = (hospital_data.get("address") or {}).get("state")
-    name = hospital_data.get("hospital_name")
-    exact: list[NPPESResult] = []
-    nppes_search_truncated = False
-    if name and state:
-        try:
-            found = nppes_client.search_organizations(name, state)
-            nppes_search_truncated = found.truncated
-            if not found.truncated:
-                exact = _exact_name_matches(found.results, name)
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.warning("NPPES search failed (%s); using the CMS record alone", exc)
+    ccn = str(hospital_data.get("ccn") or "").strip()
+    try:
+        primary_npi = cms_client.get_primary_npi_by_ccn(ccn)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error("Could not resolve a primary CMS NPI for CCN %s: %s", ccn, exc)
+        return None, None, 1
 
-    if len(exact) == 1:
-        logger.info(
-            "Joined to NPPES NPI %s; its taxonomies will drive hospital_service",
-            exact[0].npi,
+    try:
+        nppes_result = nppes_client.get_organization_by_npi(primary_npi)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error(
+            "CMS primary NPI %s for CCN %s is not available in NPPES (%s). "
+            "Use --npi <NPI> to select an organization directly.",
+            primary_npi,
+            ccn,
+            exc,
         )
-        return exact[0], hospital_data, 0
+        return None, None, 1
 
-    # Both fallbacks below use the CMS record alone, but they must not share a
-    # message: "ambiguous" and "absent" tell the user to do different things.
-    if len(exact) > 1:
-        logger.warning(
-            "%d NPPES organizations share the exact name %r in %s, so the join is "
-            "ambiguous and this tool will not guess. Using the CMS record alone: "
-            "hl7.yml id_number will be CCN %s and hospital_service will default to "
-            "MED. Re-run with --npi <NPI> to pick up the real taxonomies.",
-            len(exact),
-            name,
-            state,
-            hospital_data.get("ccn"),
-        )
-        return _synthesize_from_cms(hospital_data), hospital_data, 0
-
-    if nppes_search_truncated:
-        logger.warning(
-            "NPPES search results for %r in %s could not be verified as complete, so "
-            "this tool will not use an exact match from that page. Falling back to the CMS "
-            "record: hl7.yml id_number will be CCN %s and hospital_service will "
-            "default to MED. Re-run with --npi to select the organization directly.",
-            name,
-            state,
-            hospital_data.get("ccn"),
-        )
-    else:
-        logger.warning(
-            "No NPPES organization is registered as %r -- NPPES often records the legal "
-            "entity instead (John H. Stroger Jr. Hospital is 'COOK COUNTY'). Falling back "
-            "to the CMS record: hl7.yml id_number will be CCN %s and hospital_service will "
-            "default to MED.",
-            name,
-            hospital_data.get("ccn"),
-        )
-    return _synthesize_from_cms(hospital_data), hospital_data, 0
-
+    logger.info(
+        "Resolved CMS CCN %s to primary NPI %s (%s)",
+        ccn,
+        primary_npi,
+        nppes_result.organization_name,
+    )
+    return nppes_result, hospital_data, 0
 
 def run_generate(args: argparse.Namespace) -> int:
     """Execute the generate command."""
