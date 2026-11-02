@@ -78,8 +78,9 @@ emergency services. It does not write the hospital type to a config file. These 
 different names for the same enrolled facility. For example, NPPES names the primary NPI
 `COOK COUNTY`, while CMS names CCN `140124` `JOHN H STROGER JR HOSPITAL`.
 
-For `--zip`, Census demographics and practitioner searches use the CMS facility ZIP. Other input
-paths use the NPPES location ZIP. The generated organization address remains the NPPES address.
+When the ZIP path selects the hospital, Census demographics and practitioner searches use the CMS
+facility ZIP. Other input paths use the NPPES location ZIP. The generated organization address
+remains the NPPES address.
 
 Additional options:
 

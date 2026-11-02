@@ -374,6 +374,12 @@ class TestZipBranch:
         assert env.census.zctas == ["60601"]
         assert env.nppes.doctor_calls == ["60601"]
 
+    def test_npi_path_does_not_use_zip_selector_for_enrichment(self, env):
+        env.nppes.by_npi = nppes_org("1730209545", "COOK COUNTY", "606013714")
+        assert cli.run_generate(make_args(npi="1730209545", zip="60612")) == 0
+        assert env.census.zctas == ["60601"]
+        assert env.nppes.doctor_calls == ["60601"]
+
 
 class TestValidationExitCodes:
     def test_strict_exits_nonzero_when_a_check_fails(self, env):

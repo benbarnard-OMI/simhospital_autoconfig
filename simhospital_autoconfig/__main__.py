@@ -353,6 +353,7 @@ def run_generate(args: argparse.Namespace) -> int:
     # Pre-populated when --zip already resolved the facility in the CMS catalog, so
     # the shared tail below does not have to join it a second time.
     hospital_data: dict | None = None
+    resolved_via_zip = False
     demographics = None
     doctors: list[dict] = []
 
@@ -368,6 +369,7 @@ def run_generate(args: argparse.Namespace) -> int:
             logger.error("Failed to fetch NPPES data: %s", exc)
             return 1
     elif args.zip:
+        resolved_via_zip = True
         nppes_result, hospital_data, exit_code = _resolve_by_zip(cms_client, nppes_client, args)
         if exit_code:
             return exit_code
@@ -402,7 +404,7 @@ def run_generate(args: argparse.Namespace) -> int:
                 )
 
         logger.info("Fetching Census demographics")
-        if args.zip:
+        if resolved_via_zip:
             cms_postal_code = (hospital_data.get("address") or {}).get("postal_code")
             postal_code = cms_postal_code or args.zip
         else:
