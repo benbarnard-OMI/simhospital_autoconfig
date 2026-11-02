@@ -1,6 +1,6 @@
 # Project Progress — simhospital_autoconfig
 
-_Last updated: 2026-11-02. PR #33 is merged. CMS primary-NPI ZIP resolution is in progress._
+_Last updated: 2026-11-02. PR #33 is merged. CMS primary-NPI ZIP resolution is under review in PR #35._
 
 ## Current state
 
@@ -14,7 +14,7 @@ _Last updated: 2026-11-02. PR #33 is merged. CMS primary-NPI ZIP resolution is i
 
 ## Current validation
 
-Validation results for the CMS primary-NPI change will be recorded after the implementation and end-to-end checks pass.
+- PR #35 is open and unmerged. Its head is `9175da8`.\n- Local pytest passed: 179 passed, 7 skipped. Ruff, shell syntax, and `git diff --check` passed.\n- On PR head `9175da8`, pytest and simulator-validation checks passed. Kilo review completed.\n- The manual Simulator end-to-end workflow passed on `main` at `b1fc054`. It built the pinned simulator and completed all four HL7 messages with the required segments. [Run 41433723967](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41433723967).\n- Local `make validate-simulator` could not reach NPPES because DNS is blocked. Local `make test-simulator-e2e` could not run because this checkout has no Simhospital binary. CI provides those checks.\n- Offline tests cover the ZIP workflow and CMS catalog behavior. The CMS catalog and current CSV were not checked live from this local sandbox because it has no DNS access.
 
 > **Historical record:** The sections below describe work before PR #33 merged. They document earlier validation and prior ZIP behavior. Use the current state above for the active implementation.
 
