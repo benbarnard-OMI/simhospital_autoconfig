@@ -30,9 +30,9 @@ CSV_URL = (
 ENROLLMENT_RELEASE = "https://data.cms.gov/data-api/v1/dataset/latest-enrollments/data-viewer"
 ENROLLMENT_CSV_URL = "https://data.cms.gov/sites/files/hospital-enrollments.csv"
 ENROLLMENT_CSV = (
-    "CCN,NPI,MULTIPLE NPI FLAG\n"
-    "140124,1588612832,Y\n"
-    "140119,1699921007,N\n"
+    "NPI,MULTIPLE NPI FLAG,CCN\n"
+    "1588612832,Y,140124\n"
+    "1699921007,N,140119\n"
 )
 
 CSV_BODY = (
@@ -115,9 +115,10 @@ def test_get_primary_npi_by_exact_ccn_uses_main_npi_even_when_multiple_flag_is_s
 
 def test_enrollment_csv_with_windows_1252_text_still_resolves_primary_npi():
     client = CMSClient()
-    csv_bytes = "CCN,NPI,LEGAL BUSINESS NAME\n140124,1588612832,COOK COUNTY – HOSPITAL\n".encode(
-        "cp1252"
-    )
+    csv_bytes = (
+        "NPI,MULTIPLE NPI FLAG,CCN,ORGANIZATION NAME\n"
+        "1588612832,Y,140124,COOK COUNTY – HOSPITAL\n"
+    ).encode("cp1252")
     with requests_mock.Mocker() as m:
         _mock_enrollments(m, csv_bytes)
         assert client.get_primary_npi_by_ccn("140124") == "1588612832"
@@ -126,13 +127,23 @@ def test_enrollment_csv_with_windows_1252_text_still_resolves_primary_npi():
 @pytest.mark.parametrize(
     ("csv_text", "message"),
     [
-        ("CCN,NPI\n140119,1699921007\n", "0 rows for CCN 140124"),
         (
-            "CCN,NPI\n140124,1588612832\n140124,1234567890\n",
+            "NPI,MULTIPLE NPI FLAG,CCN\n1699921007,N,140119\n",
+            "0 rows for CCN 140124",
+        ),
+        (
+            "NPI,MULTIPLE NPI FLAG,CCN\n"
+            "1588612832,Y,140124\n1234567890,Y,140124\n",
             "2 rows for CCN 140124",
         ),
-        ("CCN,NPI\n140124,\n", "no valid primary NPI"),
-        ("CCN,NPI\n140124,12345\n", "no valid primary NPI"),
+        (
+            "NPI,MULTIPLE NPI FLAG,CCN\n, N,140124\n",
+            "no valid primary NPI",
+        ),
+        (
+            "NPI,MULTIPLE NPI FLAG,CCN\n12345,N,140124\n",
+            "no valid primary NPI",
+        ),
     ],
 )
 def test_invalid_or_ambiguous_enrollment_rows_fail(csv_text, message):
