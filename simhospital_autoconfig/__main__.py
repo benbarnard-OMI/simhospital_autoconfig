@@ -339,6 +339,7 @@ def _resolve_by_zip(
     )
     return nppes_result, hospital_data, 0
 
+
 def run_generate(args: argparse.Namespace) -> int:
     """Execute the generate command."""
     if args.verbose:
