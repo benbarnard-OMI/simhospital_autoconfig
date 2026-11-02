@@ -202,8 +202,24 @@ class TestNameStateBranch:
                 make_args(name="Rush University Medical Center", state="IL")
             ) == 1
 
-        assert "search is incomplete" in caplog.text
+        assert "could not be verified as complete" in caplog.text
         assert "--npi" in caplog.text
+        assert not env.generated
+
+    def test_unknown_result_count_fails_closed_without_logging_error(self, env, caplog):
+        env.nppes.search = NPPESearchResults(
+            [nppes_org(RUSH_NPI, "RUSH UNIVERSITY MEDICAL CENTER")], None
+        )
+
+        with caplog.at_level(logging.ERROR):
+            assert cli.run_generate(
+                make_args(name="Rush University Medical Center", state="IL")
+            ) == 1
+
+        assert "could not be verified as complete" in caplog.text
+        assert "--npi" in caplog.text
+        assert "Logging error" not in caplog.text
+        assert "None" not in caplog.text
         assert not env.generated
 
     def test_no_results_hints_at_the_legal_entity_name(self, env, caplog):
@@ -302,10 +318,13 @@ class TestZipBranch:
         assert cli.run_generate(make_args(zip="60612", dry_run=False)) == 0
         assert len(env.cms.search_calls) == 1
 
-    def test_zip_path_does_not_join_from_a_truncated_nppes_page(self, env, caplog):
+    @pytest.mark.parametrize("result_count", [500, None])
+    def test_zip_path_does_not_join_from_an_unverified_nppes_page(
+        self, env, caplog, result_count
+    ):
         env.cms.rows = [CMS_ROW]
         env.nppes.search = NPPESearchResults(
-            [nppes_org(RUSH_NPI, "JOHN H STROGER JR HOSPITAL")], 500
+            [nppes_org(RUSH_NPI, "JOHN H STROGER JR HOSPITAL")], result_count
         )
 
         with caplog.at_level(logging.WARNING):
@@ -315,7 +334,8 @@ class TestZipBranch:
         assert nppes_result.npi == STROGER_CCN
         assert kwargs["hospital_data"]["ccn"] == STROGER_CCN
         assert "search results" in caplog.text
-        assert "truncated" in caplog.text
+        assert "could not be verified as complete" in caplog.text
+        assert "truncated" not in caplog.text
         assert "--npi" in caplog.text
 
     def test_falls_back_to_a_synthesized_record_when_nppes_has_no_match(self, env, caplog):

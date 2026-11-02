@@ -215,13 +215,12 @@ def _resolve_by_name(
 
     if found.truncated:
         logger.error(
-            "NPPES returned %d results but showed only %d for %r in %s. "
-            "The search is incomplete, so it cannot select an organization safely. "
+            "NPPES results for %r in %s could not be verified as complete. "
+            "The API returned %d organizations, so this tool cannot select one safely. "
             "Use --npi to select the organization directly.",
-            found.total,
-            len(found.results),
             name,
             state.upper(),
+            len(found.results),
         )
         return None, 1
 
@@ -366,8 +365,8 @@ def _resolve_by_zip(
 
     if nppes_search_truncated:
         logger.warning(
-            "NPPES search results for %r in %s were truncated, so this tool will not "
-            "use an exact match from an incomplete page. Falling back to the CMS "
+            "NPPES search results for %r in %s could not be verified as complete, so "
+            "this tool will not use an exact match from that page. Falling back to the CMS "
             "record: hl7.yml id_number will be CCN %s and hospital_service will "
             "default to MED. Re-run with --npi to select the organization directly.",
             name,

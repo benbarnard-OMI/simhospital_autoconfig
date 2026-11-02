@@ -5,14 +5,12 @@ _Last updated: 2026-11-02. PR #33 is open. No changes are merged._
 ## Current state
 
 - PR #33 targets `main` from `chore/stabilize`. It is open and unmerged.
-- PR head `4e4793a1e4f127233df827c2a6e92d857139bafb` includes fixes for the 13 findings from the prior Kilo review.
-- On PR run [41366629305](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41366629305), the `test` and `simulator-validation` checks passed on `4e4793a`.
-- Local checks on `4e4793a`: pytest reported 168 passed and 7 TypeSafe live-API tests skipped. Ruff and shell syntax checks passed.
-- Local simulator validation on `4e4793a` accepted generated configs and passed all 17 deterministic checks.
-- Local HL7 end-to-end validation on `4e4793a` emitted `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`.
+- Commit `4e4793a1e4f127233df827c2a6e92d857139bafb` fixed the 13 findings from the first Kilo review.
+- Commit `39a2cb254a67ef9a98845739da709e93cfff8e51` fixed the next 5 findings. Its `test` and `simulator-validation` checks passed in [PR run 41368015358](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41368015358).
+- A later Kilo review of `39a2cb2` found 3 issues: handling an unknown NPPES result count in log messages, clear wording for unverified search results, and an outdated progress status. This update fixes them.
+- Local checks after these code fixes: 174 tests passed and 7 live API tests skipped. Ruff and shell syntax checks passed.
+- Local simulator validation on `39a2cb2` accepted generated configs and passed all 17 deterministic checks. The local HL7 run emitted `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`. The later code changes only update NPPES error messages and tests.
 - The GitHub HL7 end-to-end workflow is manual-only. It has not run on this PR.
-- A fresh Kilo review of `4e4793a` found follow-up issues with unknown NPPES result counts, the ZIP search path, E2E error logging, the ZIP+4 fixture, and this status text. The follow-up fixes are in this pending PR update.
-- Local validation of the follow-up changes: 172 tests passed and 7 live API tests skipped; Ruff and shell syntax checks passed; the simulator accepted generated configs and all 17 deterministic checks passed; the HL7 run emitted `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`.
 - The PR includes the full generator and validation baseline. It is not validation-only.
 - Numeric and string NPPES identifier codes now normalize to the same two-digit value.
 - CI simulator validation now requires the Census key and strict generator checks. It fails early if the secret is absent. The replacement key is now set in GitHub Actions.
@@ -20,9 +18,8 @@ _Last updated: 2026-11-02. PR #33 is open. No changes are merged._
 
 ## Remaining actions
 
-1. Push the follow-up fixes and wait for CI and a fresh Kilo review.
-2. Update this status record and PR #33 with results tied to the final commit.
-3. Keep D13 for follow-up work. Keep PR #33 open and unmerged.
+1. Review the latest Actions and Kilo results on PR #33 before merge.
+2. Keep D13 for follow-up work. Keep PR #33 open and unmerged until the owner approves merge.
 
 > **Historical record:** The sections below describe project state before PR #33. Old Docker fallback, skip behavior, and local-only simulator claims are historical. PR #33 replaces them with required local simulator validation and a pinned simulator build in CI. Use the current state above for active work and validation results.
 
