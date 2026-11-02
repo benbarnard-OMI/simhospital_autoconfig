@@ -314,7 +314,13 @@ class TestZipBranch:
 
         from simhospital_autoconfig.generators import generate_all_configs as real_generate
 
-        monkeypatch.setattr(cli, "generate_all_configs", real_generate)
+        generated_hospital_data = {}
+
+        def capture_generate(*args, **kwargs):
+            generated_hospital_data.update(kwargs["hospital_data"])
+            return real_generate(*args, **kwargs)
+
+        monkeypatch.setattr(cli, "generate_all_configs", capture_generate)
         assert cli.run_generate(
             make_args(zip="60612", name="stroger", dry_run=False, output_dir=str(tmp_path))
         ) == 0
@@ -323,6 +329,9 @@ class TestZipBranch:
         assert env.cms.enrollment_calls == [STROGER_CCN]
         assert env.nppes.npi_calls == [STROGER_NPI]
         assert not env.nppes.search_calls
+        assert generated_hospital_data["ccn"] == STROGER_CCN
+        assert generated_hospital_data["hospital_type"] == "Acute Care Hospitals"
+        assert generated_hospital_data["emergency_services"] is True
         assert "id_number: '1588612832'" in (tmp_path / "hl7.yml").read_text()
         assert STROGER_CCN not in (tmp_path / "hl7.yml").read_text()
 

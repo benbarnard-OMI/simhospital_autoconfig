@@ -71,6 +71,12 @@ valid primary NPI, or if NPPES cannot return that NPI. It never writes a CCN int
 `hl7.yml`'s `id_number`. Use `--npi` to select a specific NPI directly. CMS does not link
 NPI `1730209545` to CCN `140124`; CMS lists NPI `1588612832` as that enrollment's primary NPI.
 
+The generated config uses the NPPES record for the CMS primary NPI for the organization name,
+identifier, address, and taxonomy. It uses the CMS facility row for hospital type and emergency
+services. These sources can use different names for the same enrolled facility. For example,
+NPPES names the primary NPI `COOK COUNTY`, while CMS names CCN `140124` `JOHN H STROGER JR
+HOSPITAL`.
+
 Additional options:
 
 - `--output-dir` — Directory to write configuration files (default: current directory).
