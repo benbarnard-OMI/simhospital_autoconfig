@@ -402,12 +402,18 @@ def run_generate(args: argparse.Namespace) -> int:
                 )
 
         logger.info("Fetching Census demographics")
-        try:
-            zcta = (
-                nppes_result.address.postal_code[:5]
-                if nppes_result.address and nppes_result.address.postal_code
-                else "00000"
+        if args.zip:
+            cms_postal_code = (hospital_data.get("address") or {}).get("postal_code")
+            postal_code = cms_postal_code or args.zip
+        else:
+            postal_code = (
+                nppes_result.address.postal_code
+                if nppes_result.address
+                else None
             )
+        location_zip = postal_code[:5] if postal_code else ""
+        try:
+            zcta = location_zip or "00000"
             demographics = census_client.get_demographics(zcta)
             logger.info(
                 "Census ZCTA %s: population %d, %d ethnicity categories",
@@ -426,18 +432,17 @@ def run_generate(args: argparse.Namespace) -> int:
 
         logger.info("Fetching doctors by location")
         try:
-            if nppes_result.address and nppes_result.address.postal_code:
+            if location_zip:
                 # A hospital's own NPPES taxonomies are organizational -- Stroger's sole
                 # entry is "General Acute Care Hospital" -- which matches almost no
                 # individual practitioners. Search the fixed clinical roster instead;
                 # each practitioner's own taxonomy decides their HL7 code.
-                doctors = nppes_client.fetch_doctors_by_location(
-                    nppes_result.address.postal_code[:5],
-                )
+                doctors = nppes_client.fetch_doctors_by_location(location_zip)
                 logger.info("Fetched %d practitioners", len(doctors))
             else:
                 logger.warning(
-                    "No postal code in the NPPES address; doctors.yml will not be generated"
+                    "No postal code in the CMS facility or NPPES address; "
+                    "doctors.yml will not be generated"
                 )
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("NPPES doctor fetch failed, continuing without doctors: %s", exc)

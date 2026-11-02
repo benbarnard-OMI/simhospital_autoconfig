@@ -78,6 +78,9 @@ emergency services. It does not write the hospital type to a config file. These 
 different names for the same enrolled facility. For example, NPPES names the primary NPI
 `COOK COUNTY`, while CMS names CCN `140124` `JOHN H STROGER JR HOSPITAL`.
 
+For `--zip`, Census demographics and practitioner searches use the CMS facility ZIP. Other input
+paths use the NPPES location ZIP. The generated organization address remains the NPPES address.
+
 Additional options:
 
 - `--output-dir` — Directory to write configuration files (default: current directory).
@@ -198,7 +201,7 @@ The fixture provenance and intentional refresh procedure are documented in
 - **CMS and NPPES can list different NPIs for one organization.** ZIP lookup uses the primary NPI in CMS Hospital Enrollments. CMS links CCN `140124` to primary NPI `1588612832`; it does not link NPI `1730209545` to that CCN. Use `--npi` to select a specific NPI. The ZIP path stops if CMS cannot provide one primary NPI or NPPES cannot return it.
 - **Rate limits:** NPPES has undocumented rate limits (~2-3 requests/second). The client implements exponential backoff on HTTP 429 responses and sleeps between practitioner searches.
 - **CMS server-side filtering does not work.** The catalog ignores `filter[...]` parameters and rejects `conditions[...]`, so the full 1.4 MB CSV is downloaded once per run and filtered in memory.
-- **ZCTA vs ZIP mismatch:** ZIP codes and ZCTAs are not always identical. The generator uses the first five digits of the NPPES **LOCATION** address, which is the facility; the MAILING address is frequently an administrative office in a different ZCTA with a different population.
+- **ZCTA vs ZIP mismatch:** ZIP codes and ZCTAs are not always identical. ZIP lookup uses the first five digits of the CMS facility ZIP for Census data and practitioner searches. Other input paths use the first five digits of the NPPES **LOCATION** address. NPPES mailing addresses can be administrative offices in a different ZCTA.
 - **Missing data fallbacks:** If a data source fails, the generator warns and continues with default values. For `ethnicity.csv` that default is the upstream UK distribution, which does not describe a US hospital — the warning says so explicitly, and the `ethnicity_not_uk_default` deterministic check fails on it.
 - **Doctor search:** practitioners are found by searching a fixed clinical roster near the hospital ZIP, because a hospital's own NPPES taxonomies are organizational and match almost no individuals. NPPES taxonomy search is fuzzy, so results may include providers with similar but not exact specialties.
 - **Specialty granularity:** NUCC taxonomies are mapped onto the 14 HL7 Table 0069 codes Simhospital's own `doctors.yml` uses. Most NUCC descriptions (dental, durable medical equipment, non-clinical services) have no counterpart there and fall back to `MED`.

@@ -113,6 +113,12 @@ def test_get_primary_npi_by_exact_ccn_uses_main_npi_even_when_multiple_flag_is_s
         assert client.get_primary_npi_by_ccn("140124") == "1588612832"
 
 
+def test_empty_ccn_fails_before_download():
+    client = CMSClient()
+    with pytest.raises(ValueError, match="No CCN was provided"):
+        client.get_primary_npi_by_ccn("")
+
+
 def test_enrollment_csv_with_windows_1252_text_still_resolves_primary_npi():
     client = CMSClient()
     csv_bytes = (

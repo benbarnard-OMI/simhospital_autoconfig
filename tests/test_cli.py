@@ -363,9 +363,16 @@ class TestZipBranch:
 
     def test_census_uses_the_cms_zip(self, env):
         env.cms.rows = [CMS_ROW]
-        env.nppes.by_npi = nppes_org(STROGER_NPI, "COOK COUNTY")
+        env.nppes.by_npi = nppes_org(STROGER_NPI, "COOK COUNTY", "606013833")
         assert cli.run_generate(make_args(zip="60612")) == 0
         assert env.census.zctas == ["60612"]
+        assert env.nppes.doctor_calls == ["60612"]
+
+    def test_npi_workflow_keeps_using_nppes_zip(self, env):
+        env.nppes.by_npi = nppes_org("1730209545", "COOK COUNTY", "606013714")
+        assert cli.run_generate(make_args(npi="1730209545")) == 0
+        assert env.census.zctas == ["60601"]
+        assert env.nppes.doctor_calls == ["60601"]
 
 
 class TestValidationExitCodes:

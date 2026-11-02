@@ -182,6 +182,11 @@ class CMSClient:
     def get_primary_npi_by_ccn(self, ccn: str) -> str:
         """Return the single primary enrollment NPI for an exact CCN."""
         wanted = (ccn or "").strip()
+        if not wanted:
+            raise ValueError(
+                "No CCN was provided for the CMS enrollment lookup; "
+                "use --npi to select an organization directly"
+            )
         matches = [
             row
             for row in self.load_enrollment_rows()
