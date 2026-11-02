@@ -31,7 +31,7 @@ simhospital-autoconfig generate --npi 1730209545 --output-dir ./config
 Supported input types:
 
 - `--npi <NPI>` — Primary workflow and the most reliable. Fetches the hospital from NPPES by NPI.
-- `--zip <ZIP> [--name <fragment>] [--state <XX>]` — Resolves the ZIP through the CMS catalog. A ZIP often holds several hospitals (60612 holds four), so narrow it with `--name`.
+- `--zip <ZIP> [--name <fragment>] [--state <XX>]` — Resolves one hospital through CMS Hospital General Information, then joins its exact CCN to the primary NPI in CMS Hospital Enrollments. It fetches the organization details from NPPES. A ZIP often holds several hospitals (60612 holds four), so narrow it with `--name`.
 - `--name "<Hospital Name>" --state <XX>` — Searches NPPES by legal business name. Works, but see the caveats below.
 
 ```bash
@@ -63,13 +63,24 @@ match is fuzzy:
 - `--name "RUSH UNIVERSITY MEDICAL CENTER" --state IL` finds **73** exact matches; large
   health systems register many NPIs under one legal name, across campuses and departments.
 
-Prefer `--npi`, or `--zip --name`, which resolves through CMS (one row per facility) and uses
-NPPES only to pick up taxonomies.
+Prefer `--npi`, or `--zip --name`. The ZIP path uses the primary NPI in the CMS enrollment row.
+For example, CMS links Stroger CCN `140124` to primary NPI `1588612832`.
 
-When `--zip` resolves a facility in CMS but cannot join it to exactly one NPPES record, the
-CMS row is used on its own: `hl7.yml`'s `id_number` becomes the CCN and `hospital_service`
-defaults to `MED`, because there are no taxonomies to derive it from. That substitution is
-logged as a warning rather than happening silently.
+The ZIP path exits with an error if CMS does not return exactly one enrollment row with a
+valid primary NPI, or if NPPES cannot return that NPI. It never writes a CCN into
+`hl7.yml`'s `id_number`. Use `--npi` to select a specific NPI directly. CMS does not link
+NPI `1730209545` to CCN `140124`; CMS lists NPI `1588612832` as that enrollment's primary NPI.
+
+The generated config uses the NPPES record for the CMS primary NPI for the organization name,
+identifier, address, and taxonomy. CMS provides the matched facility's type and emergency-services
+details. The current generator uses the emergency-services value to report when a facility has no
+emergency services. It does not write the hospital type to a config file. These sources can use
+different names for the same enrolled facility. For example, NPPES names the primary NPI
+`COOK COUNTY`, while CMS names CCN `140124` `JOHN H STROGER JR HOSPITAL`.
+
+When the ZIP path selects the hospital, Census demographics and practitioner searches use the CMS
+facility ZIP. Other input paths use the NPPES location ZIP. The generated organization address
+remains the NPPES address.
 
 Additional options:
 
@@ -183,14 +194,15 @@ The fixture provenance and intentional refresh procedure are documented in
 - [NPPES](https://npiregistry.cms.hhs.gov/api-page) — National Plan and Provider Enumeration System. Provides hospital name, address, taxonomies, and identifiers, and is the source for practitioner records in `doctors.yml`.
 - [Census ACS](https://www.census.gov/data/developers/guidance/api-user-guide.html) — American Community Survey 5-Year estimates (default release: 2023). Table `B03002` provides the race/ethnicity distribution used for `ethnicity.csv`, mapped to HL7 v2 Table 0005 / CDC codes. **Requires an API key** — see Limitations.
 - [CMS Provider Data Catalog](https://data.cms.gov/provider-data/dataset/xubh-q36u) — Hospital General Information. Provides hospital type, emergency services status, and the facility address. Resolved through the catalog's metastore to a versioned bulk CSV, then filtered locally.
+- [CMS Hospital Enrollments](https://data.cms.gov/provider-characteristics/hospitals-and-other-facilities/hospital-enrollments) — Provides the primary NPI for each enrolled hospital CCN. CMS lists additional NPIs in a separate file ([Hospital Data Guidance](https://data.cms.gov/sites/default/files/2026-02/Hospital_Data_Guidance.pdf)). The ZIP workflow resolves the latest CSV through the [CMS data catalog](https://data.cms.gov/data.json) and uses the primary NPI only.
 
 ## Limitations
 
 - **Census API key is required, not optional.** Without `CENSUS_API_KEY`, `api.census.gov` returns an HTTP 200 HTML "Missing Key" page rather than an error. The client now raises immediately with a remediation message. Get a free key at <https://api.census.gov/data/key_signup.html> and put it in `.env` (see `.env.example`).
-- **CMS cannot always be joined to NPPES.** The catalog has no NPI column, so the join is CCN first and facility-name-plus-state second. NPPES often publishes the legal entity rather than the hospital — NPI `1730209545` is named "COOK COUNTY" while CMS calls it "JOHN H STROGER JR HOSPITAL", and NPPES publishes no CCN for it. When there is no match the CLI warns and `locations.yml` uses built-in defaults rather than guessing.
+- **CMS and NPPES can list different NPIs for one organization.** ZIP lookup uses the primary NPI in CMS Hospital Enrollments. CMS links CCN `140124` to primary NPI `1588612832`; it does not link NPI `1730209545` to that CCN. Use `--npi` to select a specific NPI. The ZIP path stops if CMS cannot provide one primary NPI or NPPES cannot return it.
 - **Rate limits:** NPPES has undocumented rate limits (~2-3 requests/second). The client implements exponential backoff on HTTP 429 responses and sleeps between practitioner searches.
 - **CMS server-side filtering does not work.** The catalog ignores `filter[...]` parameters and rejects `conditions[...]`, so the full 1.4 MB CSV is downloaded once per run and filtered in memory.
-- **ZCTA vs ZIP mismatch:** ZIP codes and ZCTAs are not always identical. The generator uses the first five digits of the NPPES **LOCATION** address, which is the facility; the MAILING address is frequently an administrative office in a different ZCTA with a different population.
+- **ZCTA vs ZIP mismatch:** ZIP codes and ZCTAs are not always identical. ZIP lookup uses the first five digits of the CMS facility ZIP for Census data and practitioner searches. Other input paths use the first five digits of the NPPES **LOCATION** address. NPPES mailing addresses can be administrative offices in a different ZCTA.
 - **Missing data fallbacks:** If a data source fails, the generator warns and continues with default values. For `ethnicity.csv` that default is the upstream UK distribution, which does not describe a US hospital — the warning says so explicitly, and the `ethnicity_not_uk_default` deterministic check fails on it.
 - **Doctor search:** practitioners are found by searching a fixed clinical roster near the hospital ZIP, because a hospital's own NPPES taxonomies are organizational and match almost no individuals. NPPES taxonomy search is fuzzy, so results may include providers with similar but not exact specialties.
 - **Specialty granularity:** NUCC taxonomies are mapped onto the 14 HL7 Table 0069 codes Simhospital's own `doctors.yml` uses. Most NUCC descriptions (dental, durable medical equipment, non-clinical services) have no counterpart there and fall back to `MED`.

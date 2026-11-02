@@ -9,7 +9,9 @@ import requests_mock
 
 from simhospital_autoconfig.__main__ import _find_ccn
 from simhospital_autoconfig.cms import (
+    CMS_OPEN_DATA_CATALOG,
     CMS_PDC_BASE,
+    HOSPITAL_ENROLLMENTS_SERIES,
     HOSPITAL_GENERAL_INFO_DATASET,
     CMSClient,
 )
@@ -24,6 +26,13 @@ DISTRIBUTION_URL = f"{CMS_PDC_BASE}/metastore/schemas/distribution/items/{DISTRI
 CSV_URL = (
     "https://data.cms.gov/provider-data/sites/default/files/resources/"
     "TOKEN_1785189955/Hospital_General_Information.csv"
+)
+ENROLLMENT_RELEASE = "https://data.cms.gov/data-api/v1/dataset/latest-enrollments/data-viewer"
+ENROLLMENT_CSV_URL = "https://data.cms.gov/sites/files/hospital-enrollments.csv"
+ENROLLMENT_CSV = (
+    "NPI,MULTIPLE NPI FLAG,CCN\n"
+    "1588612832,Y,140124\n"
+    "1699921007,N,140119\n"
 )
 
 CSV_BODY = (
@@ -62,6 +71,93 @@ def test_missing_distribution_raises():
         m.get(DATASET_URL, json={"distribution": []})
         with pytest.raises(ValueError, match="exposes no distribution"):
             client.resolve_download_url()
+
+
+def _mock_enrollments(m, csv_text=ENROLLMENT_CSV):
+    m.get(
+        CMS_OPEN_DATA_CATALOG,
+        json={
+            "datasetSeries": [
+                {
+                    "title": HOSPITAL_ENROLLMENTS_SERIES,
+                    "last": {"@id": ENROLLMENT_RELEASE},
+                }
+            ],
+            "dataset": [
+                {
+                    "@id": ENROLLMENT_RELEASE,
+                    "distribution": [
+                        {"mediaType": "text/csv", "downloadURL": ENROLLMENT_CSV_URL}
+                    ],
+                }
+            ],
+        },
+    )
+    content = csv_text.encode("utf-8") if isinstance(csv_text, str) else csv_text
+    m.get(ENROLLMENT_CSV_URL, content=content)
+
+
+def test_enrollment_csv_comes_from_latest_catalog_release():
+    client = CMSClient()
+    with requests_mock.Mocker() as m:
+        _mock_enrollments(m)
+        assert client.resolve_enrollment_download_url() == ENROLLMENT_CSV_URL
+        assert client.resolve_enrollment_download_url() == ENROLLMENT_CSV_URL
+    assert sum(r.url == CMS_OPEN_DATA_CATALOG for r in m.request_history) == 1
+
+
+def test_get_primary_npi_by_exact_ccn_uses_main_npi_even_when_multiple_flag_is_set():
+    client = CMSClient()
+    with requests_mock.Mocker() as m:
+        _mock_enrollments(m)
+        assert client.get_primary_npi_by_ccn("140124") == "1588612832"
+
+
+def test_empty_ccn_fails_before_download():
+    client = CMSClient()
+    with pytest.raises(ValueError, match="No CCN was provided"):
+        client.get_primary_npi_by_ccn("")
+
+
+def test_enrollment_csv_with_windows_1252_text_still_resolves_primary_npi():
+    client = CMSClient()
+    csv_bytes = (
+        "NPI,MULTIPLE NPI FLAG,CCN,ORGANIZATION NAME\n"
+        "1588612832,Y,140124,COOK COUNTY – HOSPITAL\n"
+    ).encode("cp1252")
+    with requests_mock.Mocker() as m:
+        _mock_enrollments(m, csv_bytes)
+        assert client.get_primary_npi_by_ccn("140124") == "1588612832"
+
+
+@pytest.mark.parametrize(
+    ("csv_text", "message"),
+    [
+        (
+            "NPI,MULTIPLE NPI FLAG,CCN\n1699921007,N,140119\n",
+            "0 rows for CCN 140124",
+        ),
+        (
+            "NPI,MULTIPLE NPI FLAG,CCN\n"
+            "1588612832,Y,140124\n1234567890,Y,140124\n",
+            "2 rows for CCN 140124",
+        ),
+        (
+            "NPI,MULTIPLE NPI FLAG,CCN\n, N,140124\n",
+            "no valid primary NPI",
+        ),
+        (
+            "NPI,MULTIPLE NPI FLAG,CCN\n12345,N,140124\n",
+            "no valid primary NPI",
+        ),
+    ],
+)
+def test_invalid_or_ambiguous_enrollment_rows_fail(csv_text, message):
+    client = CMSClient()
+    with requests_mock.Mocker() as m:
+        _mock_enrollments(m, csv_text)
+        with pytest.raises(ValueError, match=message):
+            client.get_primary_npi_by_ccn("140124")
 
 
 def test_get_hospital_by_ccn():
