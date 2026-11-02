@@ -1,27 +1,26 @@
 # Project Progress — simhospital_autoconfig
 
-_Last updated: 2026-11-02. PR #33 is open. No changes are merged._
+_Last updated: 2026-11-02. PR #33 is merged in `b1fc054310a8a5637f442a90fc61e95bf54d57a4`._
 
 ## Current state
 
-- PR #33 targets `main` from `chore/stabilize`. It is open and unmerged.
-- Commit `4e4793a1e4f127233df827c2a6e92d857139bafb` fixed the 13 findings from the first Kilo review.
-- Commit `39a2cb254a67ef9a98845739da709e93cfff8e51` fixed the next 5 findings. Its `test` and `simulator-validation` checks passed in [PR run 41368015358](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41368015358).
-- A later Kilo review found issues with unknown NPPES counts, count wording, and progress status. Commits `b559575` and `6110e70` fixed them.
-- Kilo review of `6110e70` found one documentation suggestion. Commit `9a1a8b1` fixed it.
-- Local checks on code commit `6110e70`: 174 tests passed and 7 live API tests skipped. Ruff and shell syntax checks passed.
-- Local simulator validation on `6110e70` accepted generated configs and passed all 17 deterministic checks. The HL7 run emitted `ORU^R01`, `ADT^A01`, `ORU^R01`, and `ADT^A03`.
-- The current Actions status is available on the [PR checks tab](https://github.com/benbarnard-OMI/simhospital_autoconfig/pull/33/checks).
-- The GitHub HL7 end-to-end workflow is manual-only. It has not run on this PR.
-- The PR includes the full generator and validation baseline. It is not validation-only.
-- Numeric and string NPPES identifier codes now normalize to the same two-digit value.
-- CI simulator validation now requires the Census key and strict generator checks. It fails early if the secret is absent. The replacement key is now set in GitHub Actions.
-- D13 remains open. The canonical hospital does not have a usable CMS-to-NPPES match.
+- PR #33 merged the 1.0 generator and validation baseline into `main`.
+- The PR checks passed on `5ba93c7`: test, simulator-validation, and Kilo Code Review ([Actions run 41372270369](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41372270369)).
+- Post-merge CI passed on `b1fc054`: test and simulator-validation ([Actions run 41378658377](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41378658377)).
+- The manual simulator E2E workflow passed on `main` at `b1fc054`. It built the pinned simulator and validated the four HL7 messages and required segments ([Actions run 41379786588](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41379786588)).
+- The initial clean-worktree baseline check passed: pytest reported 174 passed and 7 skipped live TypeSafe checks; Ruff and shell syntax checks passed; `make validate-simulator` passed all 17 deterministic checks and Simhospital loaded the generated configs.
+- Follow-up checks on 2026-11-02 passed: pytest reported 174 passed and 7 skipped; Ruff and shell syntax checks passed. The local `make validate-simulator` attempt stopped during NPPES lookup because this environment could not resolve `npiregistry.cms.hhs.gov`. This clean worktree also has no Simhospital checkout or binary. The PR simulator-validation job checks the updated branch in CI.
+- The original checkout has no unique changes that need to be carried forward. It was left unchanged.
+- D13 remains deferred. The current CMS-to-NPPES name join does not identify the Stroger facility from NPI `1730209545` (`COOK COUNTY`). For ZIP lookup, the tool uses the CMS record alone when it cannot verify one NPPES match. It uses the CCN as `hl7.yml`'s `id_number` and defaults `hospital_service` to `MED`.
+- D13 research now has a current CMS baseline. The September 29, 2026 [Hospital Enrollments snapshot CSV](https://data.cms.gov/sites/default/files/2026-10/961708ac-2136-43cb-9587-ac64af23b6ab/Hospital_Enrollments_2026.09.29.csv) lists CCN `140124` and enrollment `O20101228000196` with NPI `1588612832`, `COOK COUNTY`, DBA `JOHN H. STROGER, JR HOSPITAL OF COOK COUNTY`, and `MULTIPLE NPI FLAG=Y`. The [interactive CMS table](https://data.cms.gov/provider-characteristics/hospitals-and-other-facilities/hospital-enrollments/data) labels this release October 2026. The matching September 29, 2026 Hospital Additional NPIs file lists 26 more NPIs for this enrollment: `1023137528`, `1043238298`, `1053942045`, `1093283533`, `1295366466`, `1336269133`, `1366073256`, `1366073355`, `1386110674`, `1396865077`, `1427689413`, `1457385775`, `1457982340`, `1457982449`, `1568093557`, `1609407691`, `1649390022`, `1649551938`, `1740811736`, `1750912648`, `1760502439`, `1790316784`, `1891329488`, `1922127844`, `1922639913`, and `1942508460` ([additional NPIs CSV](https://data.cms.gov/sites/default/files/2026-10/Hospital_Additional_NPIs_2026.09.29.csv), [CMS file guidance](https://data.cms.gov/sites/default/files/2026-07/Hospital_Data_Guidance.pdf)). NPI `1730209545` is not in the main row or this additional-NPI list. Current NPPES API queries mark both `1588612832` and `1730209545` as active Type 2 NPIs. Both list `COOK COUNTY`, address `1901 W HARRISON ST, CHICAGO, IL 60612-3714`, and taxonomy `282N00000X`; their DBA names differ ([NPI 1588612832](https://npiregistry.cms.hhs.gov/api/?number=1588612832&version=2.1), [NPI 1730209545](https://npiregistry.cms.hhs.gov/api/?number=1730209545&version=2.1)). This confirms that NPI `1730209545` remains active in NPPES. It does not link that NPI to CMS enrollment `O20101228000196`, and it does not make NPI `1588612832` a replacement for every Cook County NPI. D13 remains deferred. No matching behavior has changed.
 
 ## Remaining actions
 
-1. Keep D13 for follow-up work.
-2. PR #33 is ready for owner review. Merge is outside this work.
+1. Decide which identifiers the generator needs. The CMS enrollment files link the CCN to 27 NPIs, while NPPES also lists active NPI `1730209545` at the same organization location. Test any proposed choice against all 27 CMS NPIs, the `1730209545` NPPES record, and the current CCN. Do not treat NPI `1588612832` as a replacement for `1730209545` without a clear rule and test evidence.
+2. Compare two D13 options before implementation:
+   - **CMS enrollment crosswalk:** Join by exact CCN and enrollment ID, then validate each listed NPI against NPPES. This avoids name-only matches. The evidence shows one CMS enrollment with 27 associated NPIs, so choosing one NPI for the hospital config has a high false-match risk until the project defines which NPI the config needs. The crosswalk itself needs monthly refreshes and checks for inactive or conflicting records. Test CCN `140124`, all 27 associated NPIs, one-to-many CCN/NPI cases, missing rows, inactive NPIs, and conflicting NPPES addresses.
+   - **Maintained alias map:** Store reviewed CCN-to-NPI links for known hospitals. An exact CCN key has low false-match risk when a person verifies each mapping and the map records the intended NPI use. A wrong or stale entry can persist until review. The initial code cost is low; staff must review and update entries when identifiers change. Test all 27 CMS NPIs, the active `1730209545` record, duplicate names at different CCNs, multiple NPIs, and a stale mapping.
+3. Do not use fuzzy name matching to choose a facility. Its false-match risk is unmeasured. Keep D13 in a separate follow-up, and get approval before adding matching behavior.
 
 > **Historical record:** The sections below describe project state before PR #33. Old Docker fallback, skip behavior, and local-only simulator claims are historical. PR #33 replaces them with required local simulator validation and a pinned simulator build in CI. Use the current state above for active work and validation results.
 
