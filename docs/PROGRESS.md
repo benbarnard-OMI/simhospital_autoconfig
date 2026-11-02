@@ -14,12 +14,13 @@ _Last updated: 2026-11-02. PR #33 is merged. CMS primary-NPI ZIP resolution is u
 
 ## Current validation
 
-- PR #35 is open and unmerged. The CMS code commit is `9175da8`.
-- Local pytest passed: 179 passed, 7 skipped. Ruff, shell syntax, and `git diff --check` passed.
-- On code commit `9175da8`, pytest, simulator-validation, and Kilo review checks passed.
-- The manual Simulator end-to-end workflow passed on `main` at `b1fc054`. It built the pinned simulator and completed all four HL7 messages with the required segments. [Run 41433723967](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41433723967).
-- Local `make validate-simulator` could not reach NPPES because DNS is blocked. Local `make test-simulator-e2e` could not run because this checkout has no Simhospital binary. CI provides those checks.
-- Offline tests cover the ZIP workflow and CMS catalog behavior. The CMS catalog and current CSV were not checked live from this local sandbox because it has no DNS access.
+- PR #35 is open and unmerged. Its code and documentation head is `5e017b7`.
+- Local full pytest passed: 179 passed, 7 skipped. Focused CMS and CLI tests passed: 48 passed. Ruff, shell syntax, and `git diff --check` passed.
+- All PR checks passed on `5e017b7`: pytest, simulator validation, and Kilo review.
+- Simulator HL7 end-to-end passed on the PR branch at `5e017b7`. It built the pinned simulator and completed all four HL7 messages with the required segments. [Run 41438572447](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41438572447).
+- Offline tests cover CMS catalog lookup, exact CCN joining, missing or duplicate rows, and the ZIP CLI path.
+- Local live CMS and NPPES checks were blocked by DNS. CMS documents `NPI` and `CCN` fields in its [Hospital Enrollments data dictionary](https://data.cms.gov/sites/default/files/2023-07/Hospital_Enrollments_Data_Dictionary.pdf). CMS says additional NPIs appear in a separate file. The live CSV was not downloaded in this sandbox.
+- The Kilo review check passed. Its earlier inline comments remain visible. They raise future catalog-format and header changes, and duplicate CCN rows. The lookup fails closed when it finds anything other than one enrollment row, as the plan requires. No behavior was added for unverified future schema changes.
 
 > **Historical record:** The sections below describe work before PR #33 merged. They document earlier validation and prior ZIP behavior. Use the current state above for the active implementation.
 
