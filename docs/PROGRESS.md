@@ -8,7 +8,7 @@ _Last updated: 2026-11-02. `main` is at `b959e3d7e8a1e253ae33b0d9b0da053058882bb
 - PR #36 merged as `b959e3d`. Its post-merge CI passed: the test and lint job, and simulator validation ([run 41543962954](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41543962954)).
 - The manual simulator E2E workflow passed on current `main` at `b959e3d`. It built the pinned simulator and checked four HL7 messages and required segments ([run 41548506599](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41548506599)).
 - PR #36 local checks passed: pytest reported 182 passed and 7 skipped; Ruff, shell syntax, and `git diff --check` passed. The skipped tests require live TypeSafe access.
-- In this fresh worktree, `make validate-simulator` failed because `CENSUS_API_KEY` is not set. The generator used its UK ethnicity fallback, and strict validation failed the `ethnicity_not_uk_default` check. Post-merge CI simulator validation passed with the repository secret.
+- In this fresh worktree, Census lookup raised because `CENSUS_API_KEY` is not set. The CLI used its existing UK ethnicity fallback. Strict validation then failed the `ethnicity_not_uk_default` check. Post-merge CI simulator validation passed with the repository secret.
 - No other open PRs or issues were found before this status-only PR was opened.
 
 ## Completed work
@@ -34,7 +34,7 @@ _Last updated: 2026-11-02. `main` is at `b959e3d7e8a1e253ae33b0d9b0da053058882bb
 
 - PR #36 checks passed before merge. Post-merge CI passed on `b959e3d` in run [41543962954](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41543962954).
 - Manual simulator E2E passed on current `main` at `b959e3d`. Run [41548506599](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41548506599) built the pinned simulator and passed the four-message pathway and required HL7 segments. The earlier run [41536400519](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41536400519) also passed on feature commit `f7a9e82`.
-- Fresh local checks passed: pytest reported 182 passed and 7 skipped; Ruff, shell syntax, and `git diff --check` passed. Local simulator validation failed because this worktree has no `CENSUS_API_KEY`; strict validation caught the UK fallback. The manual simulator E2E workflow passed on current `main` at `b959e3d` (run [41548506599](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41548506599)).
+- Fresh local checks passed: pytest reported 182 passed and 7 skipped; Ruff, shell syntax, and `git diff --check` passed. Local simulator validation failed because Census lookup raised without `CENSUS_API_KEY`, the CLI used its existing UK fallback, and strict validation failed the `ethnicity_not_uk_default` check. The manual simulator E2E workflow passed on current `main` at `b959e3d` (run [41548506599](https://github.com/benbarnard-OMI/simhospital_autoconfig/actions/runs/41548506599)).
 
 > **Historical record:** The sections below describe project state before PR #33. Old Docker fallback, skip behavior, and local-only simulator claims are historical. PR #33 replaces them with required local simulator validation and a pinned simulator build in CI. Use the current state above for active work and validation results.
 
